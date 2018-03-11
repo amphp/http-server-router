@@ -1,0 +1,56 @@
+{
+    "name": "amphp/http-router",
+    "homepage": "https://github.com/amphp/http-router",
+    "description": "Router responder for Amp's HTTP server.",
+    "keywords": [
+        "http",
+        "server",
+        "router"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Daniel Lowrey",
+            "email": "rdlowrey@php.net"
+        },
+        {
+            "name": "Bob Weinand"
+        },
+        {
+            "name": "Niklas Keller",
+            "email": "me@kelunik.com"
+        },
+        {
+            "name": "Aaron Piotrowski",
+            "email": "aaron@trowski.com"
+        }
+    ],
+    "require": {
+        "amphp/http-server": "dev-master as 0.8.0",
+        "amphp/http": "^1",
+        "nikic/fast-route": "^1",
+        "cash/lrucache": "^1"
+    },
+    "require-dev": {
+        "amphp/phpunit-util": "^1",
+        "friendsofphp/php-cs-fixer": "^2.3",
+        "league/uri-schemes": "^1.1",
+        "phpunit/phpunit": "^6",
+        "infection/infection": "^0.7.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Amp\\Http\\Server\\Router\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Amp\\Http\\Server\\Router\\Test\\": "test"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "7.0.13"
+        }
+    }
+}
