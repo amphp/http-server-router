@@ -196,12 +196,18 @@ final class Router implements Responder, ServerObserver {
             );
         }
 
-        if (!empty($middlewares)) {
-            $responder = Middleware\stack($responder, ...$middlewares);
-        }
-
         if ($responder instanceof ServerObserver) {
             $this->observers->attach($responder);
+        }
+
+        if (!empty($middlewares)) {
+            foreach ($middlewares as $middleware) {
+                if ($middleware instanceof ServerObserver) {
+                    $this->observers->attach($middleware);
+                }
+            }
+
+            $responder = Middleware\stack($responder, ...$middlewares);
         }
 
         $uri = "/" . \ltrim($uri, "/");
@@ -270,6 +276,10 @@ final class Router implements Responder, ServerObserver {
     }
 
     public function onStart(Server $server): Promise {
+        if ($this->running) {
+            return new Failure(new \Error("Router already started"));
+        }
+
         if (empty($this->routes)) {
             return new Failure(new \Error(
                 "Router start failure: no routes registered"
