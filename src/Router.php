@@ -32,6 +32,9 @@ final class Router implements Responder, ServerObserver {
     /** @var array */
     private $routes = [];
 
+    /** @var \Amp\Http\Server\Middleware[] */
+    private $middlewares = [];
+
     /** @var LRUCache */
     private $cache;
 
@@ -176,10 +179,11 @@ final class Router implements Responder, ServerObserver {
      * @param string    $method The HTTP method verb for which this route applies.
      * @param string    $uri The string URI.
      * @param Responder $responder Responder invoked on a route match.
+     * @param Middleware[] ...$middlewares
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
-    public function addRoute(string $method, string $uri, Responder $responder) {
+    public function addRoute(string $method, string $uri, Responder $responder, Middleware ...$middlewares) {
         if ($this->running) {
             throw new \Error(
                 "Cannot add routes once the server has started"
@@ -190,6 +194,10 @@ final class Router implements Responder, ServerObserver {
             throw new \Error(
                 __METHOD__ . "() requires a non-empty string HTTP method at Argument 1"
             );
+        }
+
+        if (!empty($middlewares)) {
+            $responder = Middleware\stack($responder, ...$middlewares);
         }
 
         if ($responder instanceof ServerObserver) {
@@ -230,6 +238,27 @@ final class Router implements Responder, ServerObserver {
     }
 
     /**
+     * Specifies a set of middlewares that is applied to every route, but will not be applied to the fallback responder.
+     *
+     * @param \Amp\Http\Server\Middleware[] ...$middlewares
+     *
+     * @throws \Error If the server has started.
+     */
+    public function stack(Middleware ...$middlewares) {
+        if ($this->running) {
+            throw new \Error("Cannot set middlewares after the server has started");
+        }
+
+        $this->middlewares = $middlewares;
+
+        foreach ($middlewares as $middleware) {
+            if ($middleware instanceof ServerObserver) {
+                $this->observers->attach($middleware);
+            }
+        }
+    }
+
+    /**
      * Specifies an instance of Responder that is used if no routes match.
      *
      * If no fallback is given, a 404 response is returned from `respond()` when no matching routes are found.
@@ -265,6 +294,10 @@ final class Router implements Responder, ServerObserver {
                     $logger->alert(
                         "Router URI '$uri' uses method '$method' that is not in the list of allowed methods"
                     );
+                }
+
+                if (!empty($this->middlewares)) {
+                    $responder = Middleware\stack($responder, ...$this->middlewares);
                 }
 
                 $rc->addRoute($method, $uri, $responder);
