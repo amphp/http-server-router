@@ -221,6 +221,11 @@ final class Router implements Responder, ServerObserver {
     /**
      * Specifies a set of middlewares that is applied to every route, but will not be applied to the fallback responder.
      *
+     * All middlewares are called in the order they're passed, so the first middleware is the outer middleware.
+     *
+     * On repeated calls, the later call will wrap the passed middlewares around the previous stack. This ensures a
+     * router can use `stack()` and then another entity can wrap a router with additional middlewares.
+     *
      * @param Middleware[] ...$middlewares
      *
      * @throws \Error If the server has started.
@@ -230,7 +235,7 @@ final class Router implements Responder, ServerObserver {
             throw new \Error("Cannot set middlewares after the server has started");
         }
 
-        $this->middlewares = $middlewares;
+        $this->middlewares = array_merge($middlewares, $this->middlewares);
     }
 
     /**

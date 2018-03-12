@@ -2,9 +2,11 @@
 
 namespace Amp\Http\Server\Router\Test;
 
+use Amp\ByteStream\Message;
 use Amp\Failure;
 use Amp\Http\Server\CallableResponder;
 use Amp\Http\Server\Client;
+use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\Responder;
@@ -97,5 +99,63 @@ class RouterTest extends TestCase {
 
         $this->assertEquals(Status::OK, $response->getStatus());
         $this->assertSame(["name" => "bob"], $routeArgs);
+    }
+
+    public function testStack() {
+        $router = new Router;
+        $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
+            return new Response($req->getAttribute("stack"));
+        }));
+
+        $router->stack(new class implements Middleware {
+            public function process(Request $request, Responder $responder): Promise {
+                $request->setAttribute("stack", "a");
+                return $responder->respond($request);
+            }
+        }, new class implements Middleware {
+            public function process(Request $request, Responder $responder): Promise {
+                $request->setAttribute("stack", $request->getAttribute("stack") . "b");
+                return $responder->respond($request);
+            }
+        });
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
+        /** @var \Amp\Http\Server\Response $response */
+        $response = Promise\wait($router->respond($request));
+
+        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertSame("ab", Promise\wait(new Message($response->getBody())));
+    }
+
+    public function testStackMultipleCalls() {
+        $router = new Router;
+        $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
+            return new Response($req->getAttribute("stack"));
+        }));
+
+        $router->stack(new class implements Middleware {
+            public function process(Request $request, Responder $responder): Promise {
+                $request->setAttribute("stack", $request->getAttribute("stack") . "b");
+                return $responder->respond($request);
+            }
+        });
+
+        $router->stack(new class implements Middleware {
+            public function process(Request $request, Responder $responder): Promise {
+                $request->setAttribute("stack", "a");
+                return $responder->respond($request);
+            }
+        });
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
+        /** @var \Amp\Http\Server\Response $response */
+        $response = Promise\wait($router->respond($request));
+
+        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertSame("ab", Promise\wait(new Message($response->getBody())));
     }
 }
