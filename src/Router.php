@@ -17,10 +17,10 @@ final class Router implements Responder, ServerObserver {
     /** @var bool */
     private $running = false;
 
-    /** @var \FastRoute\Dispatcher */
+    /** @var Dispatcher */
     private $routeDispatcher;
 
-    /** @var \Amp\Http\Server\ErrorHandler */
+    /** @var ErrorHandler */
     private $errorHandler;
 
     /** @var Responder|null */
@@ -32,8 +32,11 @@ final class Router implements Responder, ServerObserver {
     /** @var array */
     private $routes = [];
 
-    /** @var \Amp\Http\Server\Middleware[] */
+    /** @var Middleware[] */
     private $middlewares = [];
+
+    /** @var string */
+    private $prefix = "/";
 
     /** @var LRUCache */
     private $cache;
@@ -92,9 +95,11 @@ final class Router implements Responder, ServerObserver {
                 return $this->makeMethodNotAllowedResponse($match[1], $request);
 
             default:
+                // @codeCoverageIgnoreStart
                 throw new \UnexpectedValueException(
-                    "Encountered unexpected Dispatcher code"
+                    "Encountered unexpected dispatcher code: " . $match[0]
                 );
+                // @codeCoverageIgnoreEnd
         }
     }
 
@@ -121,7 +126,7 @@ final class Router implements Responder, ServerObserver {
         return call(function () use ($methods, $request) {
             /** @var \Amp\Http\Server\Response $response */
             $response = yield $this->errorHandler->handle(Status::METHOD_NOT_ALLOWED, null, $request);
-            $response->setHeader("Allow", \implode(",", $methods));
+            $response->setHeader("allow", \implode(", ", $methods));
             return $response;
         });
     }
@@ -148,7 +153,9 @@ final class Router implements Responder, ServerObserver {
     /**
      * Prefix all currently defined routes with a given prefix.
      *
-     * @param string $prefix
+     * If this method is called multiple times, the second prefix will be before the first prefix and so on.
+     *
+     * @param string $prefix Path segment to prefix, leading and trailing slashes will be normalized.
      */
     public function prefix(string $prefix) {
         if ($this->running) {
@@ -158,9 +165,7 @@ final class Router implements Responder, ServerObserver {
         $prefix = \trim($prefix, "/");
 
         if ($prefix !== "") {
-            foreach ($this->routes as &$route) {
-                $route[1] = "/$prefix$route[1]";
-            }
+            $this->prefix = "/" . $prefix . $this->prefix;
         }
     }
 
@@ -210,43 +215,13 @@ final class Router implements Responder, ServerObserver {
             $responder = Middleware\stack($responder, ...$middlewares);
         }
 
-        $uri = "/" . \ltrim($uri, "/");
-
-        // Special-case, otherwise we redirect just to the same URI again
-        if ($uri === "/?") {
-            $uri = "/";
-        }
-
-        if (substr($uri, -2) === "/?") {
-            $canonicalUri = \substr($uri, 0, -2);
-            $redirectUri = \substr($uri, 0, -1);
-
-            $this->routes[] = [$method, $canonicalUri, $responder];
-
-            $this->routes[] = [$method, $redirectUri, new CallableResponder(static function (Request $request): Response {
-                $uri = $request->getUri();
-                $path = \rtrim($uri->getPath(), '/');
-
-                if ($uri->getQuery()) {
-                    $redirectTo = $path . "?" . $uri->getQuery();
-                } else {
-                    $redirectTo = $path;
-                }
-
-                return new Response("Canonical resource location: {$path}", [
-                    "Location" => $redirectTo,
-                    "Content-Type" => "text/plain; charset=utf-8",
-                ], Status::PERMANENT_REDIRECT);
-            })];
-        } else {
-            $this->routes[] = [$method, $uri, $responder];
-        }
+        $this->routes[] = [$method, \ltrim($uri, "/"), $responder];
     }
 
     /**
      * Specifies a set of middlewares that is applied to every route, but will not be applied to the fallback responder.
      *
-     * @param \Amp\Http\Server\Middleware[] ...$middlewares
+     * @param Middleware[] ...$middlewares
      *
      * @throws \Error If the server has started.
      */
@@ -300,11 +275,37 @@ final class Router implements Responder, ServerObserver {
                     );
                 }
 
-                if (!empty($this->middlewares)) {
-                    $responder = Middleware\stack($responder, ...$this->middlewares);
+                $responder = Middleware\stack($responder, ...$this->middlewares);
+                $uri = $this->prefix . $uri;
+
+                // Special-case, otherwise we redirect just to the same URI again
+                if ($uri === "/?") {
+                    $uri = "/";
                 }
 
-                $rc->addRoute($method, $uri, $responder);
+                if (substr($uri, -2) === "/?") {
+                    $canonicalUri = \substr($uri, 0, -2);
+                    $redirectUri = \substr($uri, 0, -1);
+
+                    $rc->addRoute($method, $canonicalUri, $responder);
+                    $rc->addRoute($method, $redirectUri, new CallableResponder(static function (Request $request): Response {
+                        $uri = $request->getUri();
+                        $path = \rtrim($uri->getPath(), '/');
+
+                        if ($uri->getQuery() !== "") {
+                            $redirectTo = $path . "?" . $uri->getQuery();
+                        } else {
+                            $redirectTo = $path;
+                        }
+
+                        return new Response("Canonical resource location: {$path}", [
+                            "location" => $redirectTo,
+                            "content-type" => "text/plain; charset=utf-8",
+                        ], Status::PERMANENT_REDIRECT);
+                    }));
+                } else {
+                    $rc->addRoute($method, $uri, $responder);
+                }
             }
         });
 

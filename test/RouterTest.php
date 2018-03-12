@@ -60,23 +60,42 @@ class RouterTest extends TestCase {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
-        $router->prefix("/mediocre-dev");
-        $mock = $this->mockServer();
-        Promise\wait($router->onStart($mock));
+        $router->prefix("amphp");
 
-        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/mediocre-dev/bob/19/"));
+        Promise\wait($router->onStart($this->mockServer()));
 
+        // Test that response is redirection
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19/"));
         /** @var \Amp\Http\Server\Response $response */
         $response = Promise\wait($router->respond($request));
 
         $this->assertEquals(Status::PERMANENT_REDIRECT, $response->getStatus());
-        $this->assertEquals("/mediocre-dev/bob/19", $response->getHeader("location"));
+        $this->assertEquals("/amphp/bob/19", $response->getHeader("location"));
 
-        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/mediocre-dev/bob/19"));
-
+        // Test that response is handled and no redirection
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19"));
         $response = Promise\wait($router->respond($request));
 
         $this->assertEquals(Status::OK, $response->getStatus());
         $this->assertSame(["name" => "bob", "age" => "19"], $routeArgs);
+    }
+
+    public function testMultiplePrefixes() {
+        $router = new Router;
+        $router->addRoute("GET", "{name}", new CallableResponder(function (Request $req) use (&$routeArgs) {
+            $routeArgs = $req->getAttribute(Router::class);
+            return new Response;
+        }));
+        $router->prefix("amphp");
+        $router->prefix("/github/");
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/github/amphp/bob"));
+        /** @var \Amp\Http\Server\Response $response */
+        $response = Promise\wait($router->respond($request));
+
+        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertSame(["name" => "bob"], $routeArgs);
     }
 }
