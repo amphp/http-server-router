@@ -250,12 +250,6 @@ final class Router implements Responder, ServerObserver {
         }
 
         $this->middlewares = $middlewares;
-
-        foreach ($middlewares as $middleware) {
-            if ($middleware instanceof ServerObserver) {
-                $this->observers->attach($middleware);
-            }
-        }
     }
 
     /**
@@ -308,6 +302,12 @@ final class Router implements Responder, ServerObserver {
 
         if ($this->fallback instanceof ServerObserver) {
             $this->observers->attach($this->fallback);
+        }
+
+        foreach ($this->middlewares as $middleware) {
+            if ($middleware instanceof ServerObserver) {
+                $this->observers->attach($middleware);
+            }
         }
 
         $promises = [];
