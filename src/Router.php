@@ -144,6 +144,8 @@ final class Router implements Responder, ServerObserver {
         }
 
         foreach ($router->routes as $route) {
+            $route[1] = \ltrim($router->prefix, "/") . $route[1];
+            $route[2] = Middleware\stack($route[2], ...$router->middlewares);
             $this->routes[] = $route;
         }
 

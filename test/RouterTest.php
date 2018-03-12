@@ -6,6 +6,7 @@ use Amp\ByteStream\Message;
 use Amp\Failure;
 use Amp\Http\Server\CallableResponder;
 use Amp\Http\Server\Client;
+use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
@@ -29,6 +30,9 @@ class RouterTest extends TestCase {
 
         $mock->method("getOptions")
             ->willReturn($options);
+
+        $mock->method("getErrorHandler")
+            ->willReturn(new DefaultErrorHandler);
 
         return $mock;
     }
@@ -157,5 +161,36 @@ class RouterTest extends TestCase {
 
         $this->assertEquals(Status::OK, $response->getStatus());
         $this->assertSame("ab", Promise\wait(new Message($response->getBody())));
+    }
+
+    public function testMerge() {
+        $responder = new CallableResponder(function (Request $req) {
+            return new Response($req->getUri()->getPath());
+        });
+
+        $routerA = new Router;
+        $routerA->prefix("a");
+        $routerA->addRoute("GET", "{name}", $responder);
+
+        $routerB = new Router;
+        $routerB->prefix("b");
+        $routerB->addRoute("GET", "{name}", $responder);
+
+        $routerA->merge($routerB);
+
+        Promise\wait($routerA->onStart($this->mockServer()));
+
+        /** @var \Amp\Http\Server\Response $response */
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/bob"));
+        $response = Promise\wait($routerA->respond($request));
+        $this->assertEquals(Status::OK, $response->getStatus());
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/b/bob"));
+        $response = Promise\wait($routerA->respond($request));
+        $this->assertEquals(Status::OK, $response->getStatus());
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/b/bob"));
+        $response = Promise\wait($routerA->respond($request));
+        $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
     }
 }
