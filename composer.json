@@ -40,7 +40,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Amp\\Http\\Server\\Router\\": "src"
+            "Amp\\Http\\Server\\": "src"
         }
     },
     "autoload-dev": {

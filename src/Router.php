@@ -1,14 +1,8 @@
 <?php
 
-namespace Amp\Http\Server\Router;
+namespace Amp\Http\Server;
 
 use Amp\Failure;
-use Amp\Http\Server\CallableResponder;
-use Amp\Http\Server\Request;
-use Amp\Http\Server\Responder;
-use Amp\Http\Server\Response;
-use Amp\Http\Server\Server;
-use Amp\Http\Server\ServerObserver;
 use Amp\Http\Status;
 use Amp\Promise;
 use cash\LRUCache;
