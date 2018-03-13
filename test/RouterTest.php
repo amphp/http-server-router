@@ -108,7 +108,7 @@ class RouterTest extends TestCase {
     public function testStack() {
         $router = new Router;
         $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
-            return new Response($req->getAttribute("stack"));
+            return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
@@ -136,7 +136,7 @@ class RouterTest extends TestCase {
     public function testStackMultipleCalls() {
         $router = new Router;
         $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
-            return new Response($req->getAttribute("stack"));
+            return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
@@ -165,7 +165,7 @@ class RouterTest extends TestCase {
 
     public function testMerge() {
         $responder = new CallableResponder(function (Request $req) {
-            return new Response($req->getUri()->getPath());
+            return new Response(Status::OK, [], $req->getUri()->getPath());
         });
 
         $routerA = new Router;
