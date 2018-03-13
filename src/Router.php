@@ -305,10 +305,10 @@ final class Router implements Responder, ServerObserver {
                             $redirectTo = $path;
                         }
 
-                        return new Response("Canonical resource location: {$path}", [
+                        return new Response(Status::PERMANENT_REDIRECT, [
                             "location" => $redirectTo,
                             "content-type" => "text/plain; charset=utf-8",
-                        ], Status::PERMANENT_REDIRECT);
+                        ], "Canonical resource location: {$path}");
                     }));
                 } else {
                     $rc->addRoute($method, $uri, $responder);
