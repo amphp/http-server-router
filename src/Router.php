@@ -3,6 +3,7 @@
 namespace Amp\Http\Server;
 
 use Amp\Failure;
+use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Status;
 use Amp\Promise;
 use cash\LRUCache;
@@ -11,7 +12,7 @@ use FastRoute\RouteCollector;
 use function Amp\call;
 use function FastRoute\simpleDispatcher;
 
-final class Router implements Responder, ServerObserver {
+final class Router implements RequestHandler, ServerObserver {
     const DEFAULT_CACHE_SIZE = 512;
 
     /** @var bool */
@@ -23,7 +24,7 @@ final class Router implements Responder, ServerObserver {
     /** @var ErrorHandler */
     private $errorHandler;
 
-    /** @var Responder|null */
+    /** @var RequestHandler|null */
     private $fallback;
 
     /** @var \SplObjectStorage */
@@ -62,7 +63,7 @@ final class Router implements Responder, ServerObserver {
      *
      * @return Promise<\Amp\Http\Server\Response>
      */
-    public function respond(Request $request): Promise {
+    public function handleRequest(Request $request): Promise {
         $method = $request->getMethod();
         $path = $request->getUri()->getPath();
 
@@ -76,17 +77,17 @@ final class Router implements Responder, ServerObserver {
         switch ($match[0]) {
             case Dispatcher::FOUND:
                 /**
-                 * @var Responder $responder
+                 * @var RequestHandler $requestHandler
                  * @var string[] $routeArgs
                  */
-                list(, $responder, $routeArgs) = $match;
+                list(, $requestHandler, $routeArgs) = $match;
                 $request->setAttribute(self::class, $routeArgs);
 
-                return $responder->respond($request);
+                return $requestHandler->handleRequest($request);
 
             case Dispatcher::NOT_FOUND:
                 if ($this->fallback !== null) {
-                    return $this->fallback->respond($request);
+                    return $this->fallback->handleRequest($request);
                 }
 
                 return $this->makeNotFoundResponse($request);
@@ -174,7 +175,7 @@ final class Router implements Responder, ServerObserver {
     /**
      * Define an application route.
      *
-     * Matched URI route arguments are made available to responders as a request attribute
+     * Matched URI route arguments are made available to request handlers as a request attribute
      * which may be accessed with:
      *
      *     $request->getAttribute(Router::class)
@@ -185,12 +186,12 @@ final class Router implements Responder, ServerObserver {
      *
      * @param string    $method The HTTP method verb for which this route applies.
      * @param string    $uri The string URI.
-     * @param Responder $responder Responder invoked on a route match.
+     * @param RequestHandler $requestHandler Request handler invoked on a route match.
      * @param Middleware[] ...$middlewares
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
-    public function addRoute(string $method, string $uri, Responder $responder, Middleware ...$middlewares) {
+    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares) {
         if ($this->running) {
             throw new \Error(
                 "Cannot add routes once the server has started"
@@ -203,8 +204,8 @@ final class Router implements Responder, ServerObserver {
             );
         }
 
-        if ($responder instanceof ServerObserver) {
-            $this->observers->attach($responder);
+        if ($requestHandler instanceof ServerObserver) {
+            $this->observers->attach($requestHandler);
         }
 
         if (!empty($middlewares)) {
@@ -214,14 +215,15 @@ final class Router implements Responder, ServerObserver {
                 }
             }
 
-            $responder = Middleware\stack($responder, ...$middlewares);
+            $requestHandler = Middleware\stack($requestHandler, ...$middlewares);
         }
 
-        $this->routes[] = [$method, \ltrim($uri, "/"), $responder];
+        $this->routes[] = [$method, \ltrim($uri, "/"), $requestHandler];
     }
 
     /**
-     * Specifies a set of middlewares that is applied to every route, but will not be applied to the fallback responder.
+     * Specifies a set of middlewares that is applied to every route, but will not be applied to the fallback request
+     * handler.
      *
      * All middlewares are called in the order they're passed, so the first middleware is the outer middleware.
      *
@@ -241,20 +243,20 @@ final class Router implements Responder, ServerObserver {
     }
 
     /**
-     * Specifies an instance of Responder that is used if no routes match.
+     * Specifies an instance of RequestHandler that is used if no routes match.
      *
      * If no fallback is given, a 404 response is returned from `respond()` when no matching routes are found.
      *
-     * @param Responder $responder
+     * @param RequestHandler $requestHandler
      *
      * @throws \Error If the server has started.
      */
-    public function setFallback(Responder $responder) {
+    public function setFallback(RequestHandler $requestHandler) {
         if ($this->running) {
-            throw new \Error("Cannot add fallback responder after the server has started");
+            throw new \Error("Cannot add fallback request handler after the server has started");
         }
 
-        $this->fallback = $responder;
+        $this->fallback = $requestHandler;
     }
 
     public function onStart(Server $server): Promise {
@@ -275,14 +277,14 @@ final class Router implements Responder, ServerObserver {
         $logger = $server->getLogger();
 
         $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger) {
-            foreach ($this->routes as list($method, $uri, $responder)) {
+            foreach ($this->routes as list($method, $uri, $requestHandler)) {
                 if (!\in_array($method, $allowedMethods, true)) {
                     $logger->alert(
                         "Router URI '$uri' uses method '$method' that is not in the list of allowed methods"
                     );
                 }
 
-                $responder = Middleware\stack($responder, ...$this->middlewares);
+                $requestHandler = Middleware\stack($requestHandler, ...$this->middlewares);
                 $uri = $this->prefix . $uri;
 
                 // Special-case, otherwise we redirect just to the same URI again
@@ -294,8 +296,8 @@ final class Router implements Responder, ServerObserver {
                     $canonicalUri = \substr($uri, 0, -2);
                     $redirectUri = \substr($uri, 0, -1);
 
-                    $rc->addRoute($method, $canonicalUri, $responder);
-                    $rc->addRoute($method, $redirectUri, new CallableResponder(static function (Request $request): Response {
+                    $rc->addRoute($method, $canonicalUri, $requestHandler);
+                    $rc->addRoute($method, $redirectUri, new CallableRequestHandler(static function (Request $request): Response {
                         $uri = $request->getUri();
                         $path = \rtrim($uri->getPath(), '/');
 
@@ -311,7 +313,7 @@ final class Router implements Responder, ServerObserver {
                         ], "Canonical resource location: {$path}");
                     }));
                 } else {
-                    $rc->addRoute($method, $uri, $responder);
+                    $rc->addRoute($method, $uri, $requestHandler);
                 }
             }
         });

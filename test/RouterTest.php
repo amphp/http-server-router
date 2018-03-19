@@ -2,15 +2,15 @@
 
 namespace Amp\Http\Server\Router\Test;
 
-use Amp\ByteStream\Message;
+use Amp\ByteStream\Payload;
 use Amp\Failure;
-use Amp\Http\Server\CallableResponder;
-use Amp\Http\Server\Client;
+use Amp\Http\Server\RequestHandler\CallableRequestHandler;
+use Amp\Http\Server\Driver\Client;
 use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
-use Amp\Http\Server\Responder;
+use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use Amp\Http\Server\Server;
@@ -25,7 +25,7 @@ class RouterTest extends TestCase {
         $options = new Options;
 
         $mock = $this->getMockBuilder(Server::class)
-            ->setConstructorArgs([$this->createMock(Responder::class), $options, $this->createMock(PsrLogger::class)])
+            ->setConstructorArgs([[], $this->createMock(RequestHandler::class), $options, $this->createMock(PsrLogger::class)])
             ->getMock();
 
         $mock->method("getOptions")
@@ -43,7 +43,7 @@ class RouterTest extends TestCase {
      */
     public function testRouteThrowsOnEmptyMethodString() {
         $router = new Router;
-        $router->addRoute("", "/uri", new CallableResponder(function () {}));
+        $router->addRoute("", "/uri", new CallableRequestHandler(function () {}));
     }
 
     public function testUpdateFailsIfStartedWithoutAnyRoutes() {
@@ -62,7 +62,7 @@ class RouterTest extends TestCase {
 
     public function testUseCanonicalRedirector() {
         $router = new Router;
-        $router->addRoute("GET", "/{name}/{age}/?", new CallableResponder(function (Request $req) use (&$routeArgs) {
+        $router->addRoute("GET", "/{name}/{age}/?", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
@@ -73,14 +73,14 @@ class RouterTest extends TestCase {
         // Test that response is redirection
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19/"));
         /** @var \Amp\Http\Server\Response $response */
-        $response = Promise\wait($router->respond($request));
+        $response = Promise\wait($router->handleRequest($request));
 
         $this->assertEquals(Status::PERMANENT_REDIRECT, $response->getStatus());
         $this->assertEquals("/amphp/bob/19", $response->getHeader("location"));
 
         // Test that response is handled and no redirection
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19"));
-        $response = Promise\wait($router->respond($request));
+        $response = Promise\wait($router->handleRequest($request));
 
         $this->assertEquals(Status::OK, $response->getStatus());
         $this->assertSame(["name" => "bob", "age" => "19"], $routeArgs);
@@ -88,7 +88,7 @@ class RouterTest extends TestCase {
 
     public function testMultiplePrefixes() {
         $router = new Router;
-        $router->addRoute("GET", "{name}", new CallableResponder(function (Request $req) use (&$routeArgs) {
+        $router->addRoute("GET", "{name}", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
@@ -99,7 +99,7 @@ class RouterTest extends TestCase {
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/github/amphp/bob"));
         /** @var \Amp\Http\Server\Response $response */
-        $response = Promise\wait($router->respond($request));
+        $response = Promise\wait($router->handleRequest($request));
 
         $this->assertEquals(Status::OK, $response->getStatus());
         $this->assertSame(["name" => "bob"], $routeArgs);
@@ -107,19 +107,19 @@ class RouterTest extends TestCase {
 
     public function testStack() {
         $router = new Router;
-        $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
+        $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
-            public function process(Request $request, Responder $responder): Promise {
+            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
                 $request->setAttribute("stack", "a");
-                return $responder->respond($request);
+                return $RequestHandler->handleRequest($request);
             }
         }, new class implements Middleware {
-            public function process(Request $request, Responder $responder): Promise {
+            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
-                return $responder->respond($request);
+                return $RequestHandler->handleRequest($request);
             }
         });
 
@@ -127,29 +127,30 @@ class RouterTest extends TestCase {
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         /** @var \Amp\Http\Server\Response $response */
-        $response = Promise\wait($router->respond($request));
+        $response = Promise\wait($router->handleRequest($request));
 
         $this->assertEquals(Status::OK, $response->getStatus());
-        $this->assertSame("ab", Promise\wait(new Message($response->getBody())));
+        $payload = new Payload($response->getBody());
+        $this->assertSame("ab", Promise\wait($payload->buffer()));
     }
 
     public function testStackMultipleCalls() {
         $router = new Router;
-        $router->addRoute("GET", "/", new CallableResponder(function (Request $req) {
+        $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
-            public function process(Request $request, Responder $responder): Promise {
+            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
-                return $responder->respond($request);
+                return $RequestHandler->handleRequest($request);
             }
         });
 
         $router->stack(new class implements Middleware {
-            public function process(Request $request, Responder $responder): Promise {
+            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
                 $request->setAttribute("stack", "a");
-                return $responder->respond($request);
+                return $RequestHandler->handleRequest($request);
             }
         });
 
@@ -157,24 +158,25 @@ class RouterTest extends TestCase {
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         /** @var \Amp\Http\Server\Response $response */
-        $response = Promise\wait($router->respond($request));
+        $response = Promise\wait($router->handleRequest($request));
 
         $this->assertEquals(Status::OK, $response->getStatus());
-        $this->assertSame("ab", Promise\wait(new Message($response->getBody())));
+        $payload = new Payload($response->getBody());
+        $this->assertSame("ab", Promise\wait($payload->buffer()));
     }
 
     public function testMerge() {
-        $responder = new CallableResponder(function (Request $req) {
+        $RequestHandler = new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getUri()->getPath());
         });
 
         $routerA = new Router;
         $routerA->prefix("a");
-        $routerA->addRoute("GET", "{name}", $responder);
+        $routerA->addRoute("GET", "{name}", $RequestHandler);
 
         $routerB = new Router;
         $routerB->prefix("b");
-        $routerB->addRoute("GET", "{name}", $responder);
+        $routerB->addRoute("GET", "{name}", $RequestHandler);
 
         $routerA->merge($routerB);
 
@@ -182,15 +184,15 @@ class RouterTest extends TestCase {
 
         /** @var \Amp\Http\Server\Response $response */
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/bob"));
-        $response = Promise\wait($routerA->respond($request));
+        $response = Promise\wait($routerA->handleRequest($request));
         $this->assertEquals(Status::OK, $response->getStatus());
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/b/bob"));
-        $response = Promise\wait($routerA->respond($request));
+        $response = Promise\wait($routerA->handleRequest($request));
         $this->assertEquals(Status::OK, $response->getStatus());
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/b/bob"));
-        $response = Promise\wait($routerA->respond($request));
+        $response = Promise\wait($routerA->handleRequest($request));
         $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
     }
 }
