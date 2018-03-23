@@ -6,7 +6,6 @@ use Amp\ByteStream\Payload;
 use Amp\Failure;
 use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Server\Driver\Client;
-use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
@@ -16,6 +15,7 @@ use Amp\Http\Server\Router;
 use Amp\Http\Server\Server;
 use Amp\Http\Status;
 use Amp\Promise;
+use Amp\Socket;
 use League\Uri;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface as PsrLogger;
@@ -24,17 +24,16 @@ class RouterTest extends TestCase {
     public function mockServer(): Server {
         $options = new Options;
 
-        $mock = $this->getMockBuilder(Server::class)
-            ->setConstructorArgs([[], $this->createMock(RequestHandler::class), $options, $this->createMock(PsrLogger::class)])
-            ->getMock();
+        $socket = $this->createMock(Socket\Server::class);
 
-        $mock->method("getOptions")
-            ->willReturn($options);
+        $server = new Server(
+            [$socket],
+            $this->createMock(RequestHandler::class),
+            $this->createMock(PsrLogger::class),
+            $options
+        );
 
-        $mock->method("getErrorHandler")
-            ->willReturn(new DefaultErrorHandler);
-
-        return $mock;
+        return $server;
     }
 
     /**
@@ -112,14 +111,14 @@ class RouterTest extends TestCase {
         }));
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
                 $request->setAttribute("stack", "a");
-                return $RequestHandler->handleRequest($request);
+                return $requestHandler->handleRequest($request);
             }
         }, new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
-                return $RequestHandler->handleRequest($request);
+                return $requestHandler->handleRequest($request);
             }
         });
 
@@ -141,16 +140,16 @@ class RouterTest extends TestCase {
         }));
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
-                return $RequestHandler->handleRequest($request);
+                return $requestHandler->handleRequest($request);
             }
         });
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $RequestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
                 $request->setAttribute("stack", "a");
-                return $RequestHandler->handleRequest($request);
+                return $requestHandler->handleRequest($request);
             }
         });
 
@@ -166,17 +165,17 @@ class RouterTest extends TestCase {
     }
 
     public function testMerge() {
-        $RequestHandler = new CallableRequestHandler(function (Request $req) {
+        $requestHandler = new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getUri()->getPath());
         });
 
         $routerA = new Router;
         $routerA->prefix("a");
-        $routerA->addRoute("GET", "{name}", $RequestHandler);
+        $routerA->addRoute("GET", "{name}", $requestHandler);
 
         $routerB = new Router;
         $routerB->prefix("b");
-        $routerB->addRoute("GET", "{name}", $RequestHandler);
+        $routerB->addRoute("GET", "{name}", $requestHandler);
 
         $routerA->merge($routerB);
 

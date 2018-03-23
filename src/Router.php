@@ -112,7 +112,7 @@ final class Router implements RequestHandler, ServerObserver {
      * @return Promise<\Amp\Http\Server\Response>
      */
     private function makeNotFoundResponse(Request $request): Promise {
-        return $this->errorHandler->handle(Status::NOT_FOUND, null, $request);
+        return $this->errorHandler->handleError(Status::NOT_FOUND, null, $request);
     }
 
     /**
@@ -126,7 +126,7 @@ final class Router implements RequestHandler, ServerObserver {
     private function makeMethodNotAllowedResponse(array $methods, Request $request): Promise {
         return call(function () use ($methods, $request) {
             /** @var \Amp\Http\Server\Response $response */
-            $response = yield $this->errorHandler->handle(Status::METHOD_NOT_ALLOWED, null, $request);
+            $response = yield $this->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, null, $request);
             $response->setHeader("allow", \implode(", ", $methods));
             return $response;
         });
