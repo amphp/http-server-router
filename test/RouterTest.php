@@ -4,12 +4,12 @@ namespace Amp\Http\Server\Router\Test;
 
 use Amp\ByteStream\Payload;
 use Amp\Failure;
-use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Server\Driver\Client;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
+use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use Amp\Http\Server\Server;
@@ -36,26 +36,36 @@ class RouterTest extends TestCase {
         return $server;
     }
 
-    /**
-     * @expectedException \Error
-     * @expectedExceptionMessage Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1
-     */
+    public function testThrowsOnInvalidCacheSize() {
+        $this->expectException(\Error::class);
+
+        new Router(0);
+    }
+
     public function testRouteThrowsOnEmptyMethodString() {
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1');
+
         $router = new Router;
-        $router->addRoute("", "/uri", new CallableRequestHandler(function () {}));
+        $router->addRoute("", "/uri", new CallableRequestHandler(function () {
+        }));
     }
 
     public function testUpdateFailsIfStartedWithoutAnyRoutes() {
-        $router = new Router;
         $mock = $this->mockServer();
+        $router = new Router;
+
         $result = $router->onStart($mock);
         $this->assertInstanceOf(Failure::class, $result);
+
         $i = 0;
+
         $result->onResolve(function (\Throwable $e) use (&$i) {
             $i++;
             $this->assertInstanceOf("Error", $e);
             $this->assertSame("Router start failure: no routes registered", $e->getMessage());
         });
+
         $this->assertSame($i, 1);
     }
 
@@ -193,5 +203,134 @@ class RouterTest extends TestCase {
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/b/bob"));
         $response = Promise\wait($routerA->handleRequest($request));
         $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
+    }
+
+    public function testFallbackInvokedOnNotFoundRoute() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $fallback = new CallableRequestHandler(function () {
+            return new Response(Status::NO_CONTENT);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+        $router->setFallback($fallback);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        /** @var \Amp\Http\Server\Response $response */
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/bar"));
+        $response = Promise\wait($router->handleRequest($request));
+        $this->assertEquals(Status::NO_CONTENT, $response->getStatus());
+    }
+
+    public function testNonAllowedMethod() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+        $router->addRoute("DELETE", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        /** @var \Amp\Http\Server\Response $response */
+        $request = new Request($this->createMock(Client::class), "POST", Uri\Http::createFromString("/foo/bar"));
+        $response = Promise\wait($router->handleRequest($request));
+        $this->assertEquals(Status::METHOD_NOT_ALLOWED, $response->getStatus());
+        $this->assertSame('GET, DELETE', $response->getHeader('allow'));
+    }
+
+    public function testMergeAfterStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot merge routers after');
+        $router->merge(new Router);
+    }
+
+    public function testPrefixAfterStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot alter routes after');
+        $router->prefix('/foo');
+    }
+
+    public function testAddRouteAfterStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot add routes once');
+        $router->addRoute("GET", "/foo", $requestHandler);
+    }
+
+    public function testStackAfterStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot set middlewares');
+        $router->stack(new Middleware\CompressionMiddleware);
+    }
+
+    public function testSetFallbackAfterStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot add fallback');
+        $router->setFallback($requestHandler);
+    }
+
+    public function testDoubleStart() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Router already started');
+        Promise\wait($router->onStart($this->mockServer()));
     }
 }
