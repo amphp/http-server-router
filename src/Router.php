@@ -65,7 +65,7 @@ final class Router implements RequestHandler, ServerObserver {
      */
     public function handleRequest(Request $request): Promise {
         $method = $request->getMethod();
-        $path = $request->getUri()->getPath();
+        $path = \rawurldecode($request->getUri()->getPath());
 
         $toMatch = "{$method}\0{$path}";
 

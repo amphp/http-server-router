@@ -205,6 +205,24 @@ class RouterTest extends TestCase {
         $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
     }
 
+    public function testPathIsMatchedDecoded() {
+        $requestHandler = new CallableRequestHandler(function () {
+            return new Response(Status::OK);
+        });
+
+        $router = new Router;
+        $router->addRoute("GET", "/fo+ö", $requestHandler);
+
+        Promise\wait($router->onStart($this->mockServer()));
+
+        $uri = "/fo+" . \rawurlencode("ö");
+
+        /** @var \Amp\Http\Server\Response $response */
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString($uri));
+        $response = Promise\wait($router->handleRequest($request));
+        $this->assertEquals(Status::OK, $response->getStatus());
+    }
+
     public function testFallbackInvokedOnNotFoundRoute() {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
