@@ -32,6 +32,7 @@
         "cash/lrucache": "^1"
     },
     "require-dev": {
+        "amphp/log": "^1",
         "amphp/phpunit-util": "^1",
         "friendsofphp/php-cs-fixer": "^2.3",
         "league/uri-schemes": "^1.1",
