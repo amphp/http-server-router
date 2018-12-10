@@ -26,7 +26,7 @@
         }
     ],
     "require": {
-        "amphp/http-server": "^0.8",
+        "amphp/http-server": "^1 || ^0.8",
         "amphp/http": "^1",
         "nikic/fast-route": "^1",
         "cash/lrucache": "^1"
