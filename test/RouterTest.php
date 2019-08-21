@@ -24,7 +24,7 @@ class RouterTest extends TestCase {
     public function mockServer(): Server {
         $options = new Options;
 
-        $socket = $this->createMock(Socket\Server::class);
+        $socket = Socket\listen('127.0.0.1:0');
 
         $server = new Server(
             [$socket],
