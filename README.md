@@ -2,6 +2,12 @@
 
 This package provides a routing `RequestHandler` for [Amp's HTTP server](https://github.com/amphp/http-server) based on the request URI and method based on [FastRoute](https://github.com/nikic/FastRoute).
 
+## Installation
+The router can be installed using composer like this:
+```bash
+composer require amphp/http-server-router
+```
+
 ## Usage
 
 **`Router`** implements `RequestHandler`. Any attached `RequestHandler` and `Middleware` instances will receive any `ServerObserver` events.
