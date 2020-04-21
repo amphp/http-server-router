@@ -20,8 +20,10 @@ use League\Uri;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface as PsrLogger;
 
-class RouterTest extends TestCase {
-    public function mockServer(): Server {
+class RouterTest extends TestCase
+{
+    public function mockServer(): Server
+    {
         $options = new Options;
 
         $socket = Socket\listen('127.0.0.1:0');
@@ -36,13 +38,15 @@ class RouterTest extends TestCase {
         return $server;
     }
 
-    public function testThrowsOnInvalidCacheSize() {
+    public function testThrowsOnInvalidCacheSize()
+    {
         $this->expectException(\Error::class);
 
         new Router(0);
     }
 
-    public function testRouteThrowsOnEmptyMethodString() {
+    public function testRouteThrowsOnEmptyMethodString()
+    {
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1');
 
@@ -51,7 +55,8 @@ class RouterTest extends TestCase {
         }));
     }
 
-    public function testUpdateFailsIfStartedWithoutAnyRoutes() {
+    public function testUpdateFailsIfStartedWithoutAnyRoutes()
+    {
         $mock = $this->mockServer();
         $router = new Router;
 
@@ -69,7 +74,8 @@ class RouterTest extends TestCase {
         $this->assertSame($i, 1);
     }
 
-    public function testUseCanonicalRedirector() {
+    public function testUseCanonicalRedirector()
+    {
         $router = new Router;
         $router->addRoute("GET", "/{name}/{age}/?", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
@@ -95,7 +101,8 @@ class RouterTest extends TestCase {
         $this->assertSame(["name" => "bob", "age" => "19"], $routeArgs);
     }
 
-    public function testMultiplePrefixes() {
+    public function testMultiplePrefixes()
+    {
         $router = new Router;
         $router->addRoute("GET", "{name}", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
@@ -114,19 +121,22 @@ class RouterTest extends TestCase {
         $this->assertSame(["name" => "bob"], $routeArgs);
     }
 
-    public function testStack() {
+    public function testStack()
+    {
         $router = new Router;
         $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise
+            {
                 $request->setAttribute("stack", "a");
                 return $requestHandler->handleRequest($request);
             }
         }, new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise
+            {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
                 return $requestHandler->handleRequest($request);
             }
@@ -143,21 +153,24 @@ class RouterTest extends TestCase {
         $this->assertSame("ab", Promise\wait($payload->buffer()));
     }
 
-    public function testStackMultipleCalls() {
+    public function testStackMultipleCalls()
+    {
         $router = new Router;
         $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise
+            {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
                 return $requestHandler->handleRequest($request);
             }
         });
 
         $router->stack(new class implements Middleware {
-            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Promise
+            {
                 $request->setAttribute("stack", "a");
                 return $requestHandler->handleRequest($request);
             }
@@ -174,7 +187,8 @@ class RouterTest extends TestCase {
         $this->assertSame("ab", Promise\wait($payload->buffer()));
     }
 
-    public function testMerge() {
+    public function testMerge()
+    {
         $requestHandler = new CallableRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getUri()->getPath());
         });
@@ -205,7 +219,8 @@ class RouterTest extends TestCase {
         $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
     }
 
-    public function testPathIsMatchedDecoded() {
+    public function testPathIsMatchedDecoded()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -223,7 +238,8 @@ class RouterTest extends TestCase {
         $this->assertEquals(Status::OK, $response->getStatus());
     }
 
-    public function testFallbackInvokedOnNotFoundRoute() {
+    public function testFallbackInvokedOnNotFoundRoute()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -244,7 +260,8 @@ class RouterTest extends TestCase {
         $this->assertEquals(Status::NO_CONTENT, $response->getStatus());
     }
 
-    public function testNonAllowedMethod() {
+    public function testNonAllowedMethod()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -262,7 +279,8 @@ class RouterTest extends TestCase {
         $this->assertSame('GET, DELETE', $response->getHeader('allow'));
     }
 
-    public function testMergeAfterStart() {
+    public function testMergeAfterStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -277,7 +295,8 @@ class RouterTest extends TestCase {
         $router->merge(new Router);
     }
 
-    public function testPrefixAfterStart() {
+    public function testPrefixAfterStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -292,7 +311,8 @@ class RouterTest extends TestCase {
         $router->prefix('/foo');
     }
 
-    public function testAddRouteAfterStart() {
+    public function testAddRouteAfterStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -307,7 +327,8 @@ class RouterTest extends TestCase {
         $router->addRoute("GET", "/foo", $requestHandler);
     }
 
-    public function testStackAfterStart() {
+    public function testStackAfterStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -322,7 +343,8 @@ class RouterTest extends TestCase {
         $router->stack(new Middleware\CompressionMiddleware);
     }
 
-    public function testSetFallbackAfterStart() {
+    public function testSetFallbackAfterStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });
@@ -337,7 +359,8 @@ class RouterTest extends TestCase {
         $router->setFallback($requestHandler);
     }
 
-    public function testDoubleStart() {
+    public function testDoubleStart()
+    {
         $requestHandler = new CallableRequestHandler(function () {
             return new Response(Status::OK);
         });

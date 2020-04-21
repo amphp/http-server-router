@@ -12,7 +12,8 @@ use FastRoute\RouteCollector;
 use function Amp\call;
 use function FastRoute\simpleDispatcher;
 
-final class Router implements RequestHandler, ServerObserver {
+final class Router implements RequestHandler, ServerObserver
+{
     const DEFAULT_CACHE_SIZE = 512;
 
     /** @var bool */
@@ -47,7 +48,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @throws \Error If `$cacheSize` is less than zero.
      */
-    public function __construct(int $cacheSize = self::DEFAULT_CACHE_SIZE) {
+    public function __construct(int $cacheSize = self::DEFAULT_CACHE_SIZE)
+    {
         if ($cacheSize <= 0) {
             throw new \Error("The number of cache entries must be greater than zero");
         }
@@ -63,7 +65,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @return Promise<\Amp\Http\Server\Response>
      */
-    public function handleRequest(Request $request): Promise {
+    public function handleRequest(Request $request): Promise
+    {
         $method = $request->getMethod();
         $path = \rawurldecode($request->getUri()->getPath());
 
@@ -111,7 +114,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @return Promise<\Amp\Http\Server\Response>
      */
-    private function makeNotFoundResponse(Request $request): Promise {
+    private function makeNotFoundResponse(Request $request): Promise
+    {
         return $this->errorHandler->handleError(Status::NOT_FOUND, null, $request);
     }
 
@@ -123,7 +127,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @return Promise<\Amp\Http\Server\Response>
      */
-    private function makeMethodNotAllowedResponse(array $methods, Request $request): Promise {
+    private function makeMethodNotAllowedResponse(array $methods, Request $request): Promise
+    {
         return call(function () use ($methods, $request) {
             /** @var \Amp\Http\Server\Response $response */
             $response = yield $this->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, null, $request);
@@ -139,7 +144,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @param self $router Router to merge.
      */
-    public function merge(self $router) {
+    public function merge(self $router)
+    {
         if ($this->running) {
             throw new \Error("Cannot merge routers after the server has started");
         }
@@ -160,7 +166,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @param string $prefix Path segment to prefix, leading and trailing slashes will be normalized.
      */
-    public function prefix(string $prefix) {
+    public function prefix(string $prefix)
+    {
         if ($this->running) {
             throw new \Error("Cannot alter routes after the server has started");
         }
@@ -191,7 +198,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
-    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares) {
+    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares)
+    {
         if ($this->running) {
             throw new \Error(
                 "Cannot add routes once the server has started"
@@ -234,12 +242,13 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @throws \Error If the server has started.
      */
-    public function stack(Middleware ...$middlewares) {
+    public function stack(Middleware ...$middlewares)
+    {
         if ($this->running) {
             throw new \Error("Cannot set middlewares after the server has started");
         }
 
-        $this->middlewares = array_merge($middlewares, $this->middlewares);
+        $this->middlewares = \array_merge($middlewares, $this->middlewares);
     }
 
     /**
@@ -251,7 +260,8 @@ final class Router implements RequestHandler, ServerObserver {
      *
      * @throws \Error If the server has started.
      */
-    public function setFallback(RequestHandler $requestHandler) {
+    public function setFallback(RequestHandler $requestHandler)
+    {
         if ($this->running) {
             throw new \Error("Cannot add fallback request handler after the server has started");
         }
@@ -259,7 +269,8 @@ final class Router implements RequestHandler, ServerObserver {
         $this->fallback = $requestHandler;
     }
 
-    public function onStart(Server $server): Promise {
+    public function onStart(Server $server): Promise
+    {
         if ($this->running) {
             return new Failure(new \Error("Router already started"));
         }
@@ -292,7 +303,7 @@ final class Router implements RequestHandler, ServerObserver {
                     $uri = "/";
                 }
 
-                if (substr($uri, -2) === "/?") {
+                if (\substr($uri, -2) === "/?") {
                     $canonicalUri = \substr($uri, 0, -2);
                     $redirectUri = \substr($uri, 0, -1);
 
@@ -338,7 +349,8 @@ final class Router implements RequestHandler, ServerObserver {
         return Promise\all($promises);
     }
 
-    public function onStop(Server $server): Promise {
+    public function onStop(Server $server): Promise
+    {
         $this->routeDispatcher = null;
         $this->running = false;
 

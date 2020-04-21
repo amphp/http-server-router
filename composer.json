@@ -34,7 +34,8 @@
     "require-dev": {
         "amphp/log": "^1",
         "amphp/phpunit-util": "^1",
-        "friendsofphp/php-cs-fixer": "^2.3",
+        "amphp/php-cs-fixer-config": "dev-master",
+        "friendsofphp/php-cs-fixer": "^2.16",
         "league/uri-schemes": "^1.1",
         "phpunit/phpunit": "^6"
     },

@@ -30,3 +30,7 @@ script:
 
 after_script:
   - ./coveralls.phar
+
+cache:
+  directories:
+    - $HOME/.php-cs-fixer
