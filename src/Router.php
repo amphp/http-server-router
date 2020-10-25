@@ -2,46 +2,39 @@
 
 namespace Amp\Http\Server;
 
-use Amp\Failure;
 use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Status;
 use Amp\Promise;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
-use function Amp\call;
+use function Amp\async;
+use function Amp\await;
 use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler, ServerObserver
 {
     const DEFAULT_CACHE_SIZE = 512;
 
-    /** @var bool */
-    private $running = false;
+    private bool $running = false;
 
-    /** @var Dispatcher */
-    private $routeDispatcher;
+    private Dispatcher $routeDispatcher;
 
-    /** @var ErrorHandler */
-    private $errorHandler;
+    private ErrorHandler $errorHandler;
 
-    /** @var RequestHandler|null */
-    private $fallback;
+    private ?RequestHandler $fallback = null;
 
-    /** @var \SplObjectStorage */
-    private $observers;
+    private \SplObjectStorage $observers;
 
-    /** @var array */
-    private $routes = [];
+    /** @var array[] */
+    private array $routes = [];
 
     /** @var Middleware[] */
-    private $middlewares = [];
+    private array $middlewares = [];
 
-    /** @var string */
-    private $prefix = "/";
+    private string $prefix = "/";
 
-    /** @var LRUCache */
-    private $cache;
+    private LRUCache $cache;
 
     /**
      * @param int $cacheSize Maximum number of route matches to cache.
@@ -63,9 +56,9 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @param Request $request
      *
-     * @return Promise<\Amp\Http\Server\Response>
+     * @return Response
      */
-    public function handleRequest(Request $request): Promise
+    public function handleRequest(Request $request): Response
     {
         $method = $request->getMethod();
         $path = \rawurldecode($request->getUri()->getPath());
@@ -112,9 +105,9 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @param Request $request
      *
-     * @return Promise<\Amp\Http\Server\Response>
+     * @return Response
      */
-    private function makeNotFoundResponse(Request $request): Promise
+    private function makeNotFoundResponse(Request $request): Response
     {
         return $this->errorHandler->handleError(Status::NOT_FOUND, null, $request);
     }
@@ -125,16 +118,13 @@ final class Router implements RequestHandler, ServerObserver
      * @param string[] $methods
      * @param Request $request
      *
-     * @return Promise<\Amp\Http\Server\Response>
+     * @return Response
      */
-    private function makeMethodNotAllowedResponse(array $methods, Request $request): Promise
+    private function makeMethodNotAllowedResponse(array $methods, Request $request): Response
     {
-        return call(function () use ($methods, $request) {
-            /** @var \Amp\Http\Server\Response $response */
-            $response = yield $this->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, null, $request);
-            $response->setHeader("allow", \implode(", ", $methods));
-            return $response;
-        });
+        $response = $this->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, null, $request);
+        $response->setHeader("allow", \implode(", ", $methods));
+        return $response;
     }
 
     /**
@@ -144,7 +134,7 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @param self $router Router to merge.
      */
-    public function merge(self $router)
+    public function merge(self $router): void
     {
         if ($this->running) {
             throw new \Error("Cannot merge routers after the server has started");
@@ -166,7 +156,7 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @param string $prefix Path segment to prefix, leading and trailing slashes will be normalized.
      */
-    public function prefix(string $prefix)
+    public function prefix(string $prefix): void
     {
         if ($this->running) {
             throw new \Error("Cannot alter routes after the server has started");
@@ -198,7 +188,7 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
-    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares)
+    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares): void
     {
         if ($this->running) {
             throw new \Error(
@@ -242,7 +232,7 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @throws \Error If the server has started.
      */
-    public function stack(Middleware ...$middlewares)
+    public function stack(Middleware ...$middlewares): void
     {
         if ($this->running) {
             throw new \Error("Cannot set middlewares after the server has started");
@@ -260,7 +250,7 @@ final class Router implements RequestHandler, ServerObserver
      *
      * @throws \Error If the server has started.
      */
-    public function setFallback(RequestHandler $requestHandler)
+    public function setFallback(RequestHandler $requestHandler): void
     {
         if ($this->running) {
             throw new \Error("Cannot add fallback request handler after the server has started");
@@ -269,16 +259,14 @@ final class Router implements RequestHandler, ServerObserver
         $this->fallback = $requestHandler;
     }
 
-    public function onStart(Server $server): Promise
+    public function onStart(Server $server): void
     {
         if ($this->running) {
-            return new Failure(new \Error("Router already started"));
+            throw new \Error("Router already started");
         }
 
         if (empty($this->routes)) {
-            return new Failure(new \Error(
-                "Router start failure: no routes registered"
-            ));
+            throw new \Error("Router start failure: no routes registered");
         }
 
         $this->running = true;
@@ -287,7 +275,7 @@ final class Router implements RequestHandler, ServerObserver
         $allowedMethods = $options->getAllowedMethods();
         $logger = $server->getLogger();
 
-        $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger) {
+        $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger): void {
             foreach ($this->routes as list($method, $uri, $requestHandler)) {
                 if (!\in_array($method, $allowedMethods, true)) {
                     $logger->alert(
@@ -343,22 +331,22 @@ final class Router implements RequestHandler, ServerObserver
 
         $promises = [];
         foreach ($this->observers as $observer) {
-            $promises[] = $observer->onStart($server);
+            $promises[] = async(fn() => $observer->onStart($server));
         }
 
-        return Promise\all($promises);
+        await(Promise\all($promises));
     }
 
-    public function onStop(Server $server): Promise
+    public function onStop(Server $server): void
     {
-        $this->routeDispatcher = null;
+        unset($this->routeDispatcher);
         $this->running = false;
 
         $promises = [];
         foreach ($this->observers as $observer) {
-            $promises[] = $observer->onStop($server);
+            $promises[] = async(fn() => $observer->onStop($server));
         }
 
-        return Promise\all($promises);
+        await(Promise\all($promises));
     }
 }
