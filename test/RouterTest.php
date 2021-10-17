@@ -26,14 +26,12 @@ class RouterTest extends TestCase
 
         $socket = Socket\Server::listen('127.0.0.1:0');
 
-        $server = new Server(
+        return new Server(
             [$socket],
             $this->createMock(RequestHandler::class),
             $this->createMock(PsrLogger::class),
             $options
         );
-
-        return $server;
     }
 
     public function testThrowsOnInvalidCacheSize(): void

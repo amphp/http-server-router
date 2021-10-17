@@ -2,14 +2,13 @@
 
 namespace Amp\Http\Server;
 
+use Amp\Future;
 use Amp\Http\Server\RequestHandler\CallableRequestHandler;
 use Amp\Http\Status;
-use Amp\Promise;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
-use function Amp\async;
-use function Amp\await;
+use function Amp\coroutine;
 use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler, ServerObserver
@@ -329,12 +328,12 @@ final class Router implements RequestHandler, ServerObserver
             }
         }
 
-        $promises = [];
+        $futures = [];
         foreach ($this->observers as $observer) {
-            $promises[] = async(fn() => $observer->onStart($server));
+            $futures[] = coroutine(static fn() => $observer->onStart($server));
         }
 
-        await(Promise\all($promises));
+        Future\all($futures);
     }
 
     public function onStop(Server $server): void
@@ -342,11 +341,11 @@ final class Router implements RequestHandler, ServerObserver
         unset($this->routeDispatcher);
         $this->running = false;
 
-        $promises = [];
+        $futures = [];
         foreach ($this->observers as $observer) {
-            $promises[] = async(fn() => $observer->onStop($server));
+            $futures[] = coroutine(static fn() => $observer->onStop($server));
         }
 
-        await(Promise\all($promises));
+        Future\all($futures);
     }
 }
