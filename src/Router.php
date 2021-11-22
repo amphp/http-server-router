@@ -8,7 +8,7 @@ use Amp\Http\Status;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
-use function Amp\coroutine;
+use function Amp\launch;
 use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler, ServerObserver
@@ -275,7 +275,23 @@ final class Router implements RequestHandler, ServerObserver
         $logger = $server->getLogger();
 
         $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger): void {
-            foreach ($this->routes as list($method, $uri, $requestHandler)) {
+            $redirectHandler = new CallableRequestHandler(static function (Request $request): Response {
+                $uri = $request->getUri();
+                $path = \rtrim($uri->getPath(), '/');
+
+                if ($uri->getQuery() !== "") {
+                    $redirectTo = $path . "?" . $uri->getQuery();
+                } else {
+                    $redirectTo = $path;
+                }
+
+                return new Response(Status::PERMANENT_REDIRECT, [
+                    "location" => $redirectTo,
+                    "content-type" => "text/plain; charset=utf-8",
+                ], "Canonical resource location: {$path}");
+            });
+
+            foreach ($this->routes as [$method, $uri, $requestHandler]) {
                 if (!\in_array($method, $allowedMethods, true)) {
                     $logger->alert(
                         "Router URI '$uri' uses method '$method' that is not in the list of allowed methods"
@@ -290,26 +306,12 @@ final class Router implements RequestHandler, ServerObserver
                     $uri = "/";
                 }
 
-                if (\substr($uri, -2) === "/?") {
+                if (str_ends_with($uri, "/?")) {
                     $canonicalUri = \substr($uri, 0, -2);
                     $redirectUri = \substr($uri, 0, -1);
 
                     $rc->addRoute($method, $canonicalUri, $requestHandler);
-                    $rc->addRoute($method, $redirectUri, new CallableRequestHandler(static function (Request $request): Response {
-                        $uri = $request->getUri();
-                        $path = \rtrim($uri->getPath(), '/');
-
-                        if ($uri->getQuery() !== "") {
-                            $redirectTo = $path . "?" . $uri->getQuery();
-                        } else {
-                            $redirectTo = $path;
-                        }
-
-                        return new Response(Status::PERMANENT_REDIRECT, [
-                            "location" => $redirectTo,
-                            "content-type" => "text/plain; charset=utf-8",
-                        ], "Canonical resource location: {$path}");
-                    }));
+                    $rc->addRoute($method, $redirectUri, $redirectHandler);
                 } else {
                     $rc->addRoute($method, $uri, $requestHandler);
                 }
@@ -330,7 +332,7 @@ final class Router implements RequestHandler, ServerObserver
 
         $futures = [];
         foreach ($this->observers as $observer) {
-            $futures[] = coroutine(static fn() => $observer->onStart($server));
+            $futures[] = launch(static fn() => $observer->onStart($server));
         }
 
         Future\all($futures);
@@ -343,7 +345,7 @@ final class Router implements RequestHandler, ServerObserver
 
         $futures = [];
         foreach ($this->observers as $observer) {
-            $futures[] = coroutine(static fn() => $observer->onStop($server));
+            $futures[] = launch(static fn() => $observer->onStop($server));
         }
 
         Future\all($futures);
