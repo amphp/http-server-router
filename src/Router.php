@@ -3,12 +3,12 @@
 namespace Amp\Http\Server;
 
 use Amp\Future;
-use Amp\Http\Server\RequestHandler\CallableRequestHandler;
+use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Status;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
-use function Amp\launch;
+use function Amp\async;
 use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler, ServerObserver
@@ -275,7 +275,7 @@ final class Router implements RequestHandler, ServerObserver
         $logger = $server->getLogger();
 
         $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger): void {
-            $redirectHandler = new CallableRequestHandler(static function (Request $request): Response {
+            $redirectHandler = new ClosureRequestHandler(static function (Request $request): Response {
                 $uri = $request->getUri();
                 $path = \rtrim($uri->getPath(), '/');
 
@@ -332,7 +332,7 @@ final class Router implements RequestHandler, ServerObserver
 
         $futures = [];
         foreach ($this->observers as $observer) {
-            $futures[] = launch(static fn() => $observer->onStart($server));
+            $futures[] = async(static fn() => $observer->onStart($server));
         }
 
         Future\all($futures);
@@ -345,7 +345,7 @@ final class Router implements RequestHandler, ServerObserver
 
         $futures = [];
         foreach ($this->observers as $observer) {
-            $futures[] = launch(static fn() => $observer->onStop($server));
+            $futures[] = async(static fn() => $observer->onStop($server));
         }
 
         Future\all($futures);

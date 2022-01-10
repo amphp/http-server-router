@@ -8,7 +8,7 @@ use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
 use Amp\Http\Server\RequestHandler;
-use Amp\Http\Server\RequestHandler\CallableRequestHandler;
+use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use Amp\Http\Server\Server;
@@ -24,7 +24,7 @@ class RouterTest extends TestCase
     {
         $options = new Options;
 
-        $socket = Socket\Server::listen('127.0.0.1:0');
+        $socket = Socket\listen('127.0.0.1:0');
 
         return new Server(
             [$socket],
@@ -47,7 +47,7 @@ class RouterTest extends TestCase
         $this->expectExceptionMessage('Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1');
 
         $router = new Router;
-        $router->addRoute("", "/uri", new CallableRequestHandler(function () {
+        $router->addRoute("", "/uri", new ClosureRequestHandler(function () {
         }));
     }
 
@@ -65,7 +65,7 @@ class RouterTest extends TestCase
     public function testUseCanonicalRedirector(): void
     {
         $router = new Router;
-        $router->addRoute("GET", "/{name}/{age}/?", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
+        $router->addRoute("GET", "/{name}/{age}/?", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
@@ -92,7 +92,7 @@ class RouterTest extends TestCase
     public function testMultiplePrefixes(): void
     {
         $router = new Router;
-        $router->addRoute("GET", "{name}", new CallableRequestHandler(function (Request $req) use (&$routeArgs) {
+        $router->addRoute("GET", "{name}", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
@@ -111,7 +111,7 @@ class RouterTest extends TestCase
     public function testStack(): void
     {
         $router = new Router;
-        $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
+        $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
@@ -142,7 +142,7 @@ class RouterTest extends TestCase
     public function testStackMultipleCalls(): void
     {
         $router = new Router;
-        $router->addRoute("GET", "/", new CallableRequestHandler(function (Request $req) {
+        $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
 
@@ -174,7 +174,7 @@ class RouterTest extends TestCase
 
     public function testMerge(): void
     {
-        $requestHandler = new CallableRequestHandler(function (Request $req) {
+        $requestHandler = new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getUri()->getPath());
         });
 
@@ -205,7 +205,7 @@ class RouterTest extends TestCase
 
     public function testPathIsMatchedDecoded(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -223,11 +223,11 @@ class RouterTest extends TestCase
 
     public function testFallbackInvokedOnNotFoundRoute(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
-        $fallback = new CallableRequestHandler(function () {
+        $fallback = new ClosureRequestHandler(function () {
             return new Response(Status::NO_CONTENT);
         });
 
@@ -244,7 +244,7 @@ class RouterTest extends TestCase
 
     public function testNonAllowedMethod(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -262,7 +262,7 @@ class RouterTest extends TestCase
 
     public function testMergeAfterStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -278,7 +278,7 @@ class RouterTest extends TestCase
 
     public function testPrefixAfterStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -294,7 +294,7 @@ class RouterTest extends TestCase
 
     public function testAddRouteAfterStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -310,7 +310,7 @@ class RouterTest extends TestCase
 
     public function testStackAfterStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -326,7 +326,7 @@ class RouterTest extends TestCase
 
     public function testSetFallbackAfterStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
@@ -342,7 +342,7 @@ class RouterTest extends TestCase
 
     public function testDoubleStart(): void
     {
-        $requestHandler = new CallableRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function () {
             return new Response(Status::OK);
         });
 
