@@ -4,6 +4,7 @@ namespace Amp\Http\Server\Router\Test;
 
 use Amp\ByteStream\Payload;
 use Amp\Http\Server\Driver\Client;
+use Amp\Http\Server\HttpSocketServer;
 use Amp\Http\Server\Middleware;
 use Amp\Http\Server\Options;
 use Amp\Http\Server\Request;
@@ -11,7 +12,7 @@ use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
-use Amp\Http\Server\Server;
+use Amp\Http\Server\HttpServer;
 use Amp\Http\Status;
 use Amp\Socket;
 use League\Uri;
@@ -20,15 +21,14 @@ use Psr\Log\LoggerInterface as PsrLogger;
 
 class RouterTest extends TestCase
 {
-    public function mockServer(): Server
+    public function mockServer(): HttpServer
     {
         $options = new Options;
 
         $socket = Socket\listen('127.0.0.1:0');
 
-        return new Server(
+        return new HttpSocketServer(
             [$socket],
-            $this->createMock(RequestHandler::class),
             $this->createMock(PsrLogger::class),
             $options
         );
@@ -38,7 +38,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(\Error::class);
 
-        new Router(0);
+        new Router($this->mockServer(), 0);
     }
 
     public function testRouteThrowsOnEmptyMethodString(): void
@@ -46,32 +46,34 @@ class RouterTest extends TestCase
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1');
 
-        $router = new Router;
+        $router = new Router($this->mockServer());
         $router->addRoute("", "/uri", new ClosureRequestHandler(function () {
         }));
     }
 
     public function testUpdateFailsIfStartedWithoutAnyRoutes(): void
     {
-        $mock = $this->mockServer();
-        $router = new Router;
+        $mockServer = $this->mockServer();
+        $router = new Router($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectDeprecationMessage("Router start failure: no routes registered");
 
-        $router->onStart($mock);
+        $router->onStart($mockServer);
     }
 
     public function testUseCanonicalRedirector(): void
     {
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/{name}/{age}/?", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
         }));
         $router->prefix("amphp");
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         // Test that response is redirection
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19/"));
@@ -91,7 +93,9 @@ class RouterTest extends TestCase
 
     public function testMultiplePrefixes(): void
     {
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "{name}", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
@@ -99,7 +103,7 @@ class RouterTest extends TestCase
         $router->prefix("amphp");
         $router->prefix("/github/");
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/github/amphp/bob"));
         $response = $router->handleRequest($request);
@@ -110,7 +114,9 @@ class RouterTest extends TestCase
 
     public function testStack(): void
     {
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
@@ -129,7 +135,7 @@ class RouterTest extends TestCase
             }
         });
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         $response = $router->handleRequest($request);
@@ -141,7 +147,9 @@ class RouterTest extends TestCase
 
     public function testStackMultipleCalls(): void
     {
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getAttribute("stack"));
         }));
@@ -162,7 +170,7 @@ class RouterTest extends TestCase
             }
         });
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         $response = $router->handleRequest($request);
@@ -174,21 +182,23 @@ class RouterTest extends TestCase
 
     public function testMerge(): void
     {
+        $mockServer = $this->mockServer();
+
         $requestHandler = new ClosureRequestHandler(function (Request $req) {
             return new Response(Status::OK, [], $req->getUri()->getPath());
         });
 
-        $routerA = new Router;
+        $routerA = new Router($mockServer);
         $routerA->prefix("a");
         $routerA->addRoute("GET", "{name}", $requestHandler);
 
-        $routerB = new Router;
+        $routerB = new Router($mockServer);
         $routerB->prefix("b");
         $routerB->addRoute("GET", "{name}", $requestHandler);
 
         $routerA->merge($routerB);
 
-        $routerA->onStart($this->mockServer());
+        $routerA->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/bob"));
         $response = $routerA->handleRequest($request);
@@ -209,10 +219,12 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/fo+ö", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $uri = "/fo+" . \rawurlencode("ö");
 
@@ -231,11 +243,13 @@ class RouterTest extends TestCase
             return new Response(Status::NO_CONTENT);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
         $router->setFallback($fallback);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/bar"));
         $response = $router->handleRequest($request);
@@ -248,11 +262,13 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
         $router->addRoute("DELETE", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $request = new Request($this->createMock(Client::class), "POST", Uri\Http::createFromString("/foo/bar"));
         $response = $router->handleRequest($request);
@@ -266,14 +282,16 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot merge routers after');
-        $router->merge(new Router);
+        $router->merge(new Router($mockServer));
     }
 
     public function testPrefixAfterStart(): void
@@ -282,10 +300,12 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot alter routes after');
@@ -298,10 +318,12 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot add routes once');
@@ -314,10 +336,12 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot set middlewares');
@@ -330,10 +354,12 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot add fallback');
@@ -346,13 +372,15 @@ class RouterTest extends TestCase
             return new Response(Status::OK);
         });
 
-        $router = new Router;
+        $mockServer = $this->mockServer();
+
+        $router = new Router($mockServer);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Router already started');
-        $router->onStart($this->mockServer());
+        $router->onStart($mockServer);
     }
 }

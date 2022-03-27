@@ -2,16 +2,14 @@
 
 namespace Amp\Http\Server;
 
-use Amp\Future;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Status;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
-use function Amp\async;
 use function FastRoute\simpleDispatcher;
 
-final class Router implements RequestHandler, ServerObserver
+final class Router implements RequestHandler
 {
     const DEFAULT_CACHE_SIZE = 512;
 
@@ -23,8 +21,6 @@ final class Router implements RequestHandler, ServerObserver
 
     private ?RequestHandler $fallback = null;
 
-    private \SplObjectStorage $observers;
-
     /** @var array[] */
     private array $routes = [];
 
@@ -33,21 +29,23 @@ final class Router implements RequestHandler, ServerObserver
 
     private string $prefix = "/";
 
-    private LRUCache $cache;
+    private readonly LRUCache $cache;
 
     /**
      * @param int $cacheSize Maximum number of route matches to cache.
      *
      * @throws \Error If `$cacheSize` is less than zero.
      */
-    public function __construct(int $cacheSize = self::DEFAULT_CACHE_SIZE)
+    public function __construct(HttpServer $httpServer, int $cacheSize = self::DEFAULT_CACHE_SIZE)
     {
+        $httpServer->onStart($this->onStart(...));
+        $httpServer->onStop($this->onStop(...));
+
         if ($cacheSize <= 0) {
-            throw new \Error("The number of cache entries must be greater than zero");
+            throw new \ValueError("The number of cache entries must be greater than zero");
         }
 
         $this->cache = new LRUCache($cacheSize);
-        $this->observers = new \SplObjectStorage;
     }
 
     /**
@@ -144,8 +142,6 @@ final class Router implements RequestHandler, ServerObserver
             $route[2] = Middleware\stack($route[2], ...$router->middlewares);
             $this->routes[] = $route;
         }
-
-        $this->observers->addAll($router->observers);
     }
 
     /**
@@ -201,17 +197,7 @@ final class Router implements RequestHandler, ServerObserver
             );
         }
 
-        if ($requestHandler instanceof ServerObserver) {
-            $this->observers->attach($requestHandler);
-        }
-
         if (!empty($middlewares)) {
-            foreach ($middlewares as $middleware) {
-                if ($middleware instanceof ServerObserver) {
-                    $this->observers->attach($middleware);
-                }
-            }
-
             $requestHandler = Middleware\stack($requestHandler, ...$middlewares);
         }
 
@@ -258,7 +244,7 @@ final class Router implements RequestHandler, ServerObserver
         $this->fallback = $requestHandler;
     }
 
-    public function onStart(Server $server): void
+    public function onStart(HttpServer $server): void
     {
         if ($this->running) {
             throw new \Error("Router already started");
@@ -319,35 +305,11 @@ final class Router implements RequestHandler, ServerObserver
         });
 
         $this->errorHandler = $server->getErrorHandler();
-
-        if ($this->fallback instanceof ServerObserver) {
-            $this->observers->attach($this->fallback);
-        }
-
-        foreach ($this->middlewares as $middleware) {
-            if ($middleware instanceof ServerObserver) {
-                $this->observers->attach($middleware);
-            }
-        }
-
-        $futures = [];
-        foreach ($this->observers as $observer) {
-            $futures[] = async(static fn() => $observer->onStart($server));
-        }
-
-        Future\all($futures);
     }
 
-    public function onStop(Server $server): void
+    public function onStop(): void
     {
         unset($this->routeDispatcher);
         $this->running = false;
-
-        $futures = [];
-        foreach ($this->observers as $observer) {
-            $futures[] = async(static fn() => $observer->onStop($server));
-        }
-
-        Future\all($futures);
     }
 }
