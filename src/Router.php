@@ -256,11 +256,7 @@ final class Router implements RequestHandler
 
         $this->running = true;
 
-        $options = $server->getOptions();
-        $allowedMethods = $options->getAllowedMethods();
-        $logger = $server->getLogger();
-
-        $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc) use ($allowedMethods, $logger): void {
+        $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc): void {
             $redirectHandler = new ClosureRequestHandler(static function (Request $request): Response {
                 $uri = $request->getUri();
                 $path = \rtrim($uri->getPath(), '/');
@@ -278,12 +274,6 @@ final class Router implements RequestHandler
             });
 
             foreach ($this->routes as [$method, $uri, $requestHandler]) {
-                if (!\in_array($method, $allowedMethods, true)) {
-                    $logger->alert(
-                        "Router URI '$uri' uses method '$method' that is not in the list of allowed methods"
-                    );
-                }
-
                 $requestHandler = Middleware\stack($requestHandler, ...$this->middlewares);
                 $uri = $this->prefix . $uri;
 
