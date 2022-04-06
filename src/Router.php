@@ -17,8 +17,6 @@ final class Router implements RequestHandler
 
     private Dispatcher $routeDispatcher;
 
-    private ErrorHandler $errorHandler;
-
     private ?RequestHandler $fallback = null;
 
     /** @var array[] */
@@ -36,8 +34,11 @@ final class Router implements RequestHandler
      *
      * @throws \Error If `$cacheSize` is less than zero.
      */
-    public function __construct(HttpServer $httpServer, int $cacheSize = self::DEFAULT_CACHE_SIZE)
-    {
+    public function __construct(
+        HttpServer $httpServer,
+        private readonly ErrorHandler $errorHandler,
+        int $cacheSize = self::DEFAULT_CACHE_SIZE
+    ) {
         $httpServer->onStart($this->onStart(...));
         $httpServer->onStop($this->onStop(...));
 
@@ -293,8 +294,6 @@ final class Router implements RequestHandler
                 }
             }
         });
-
-        $this->errorHandler = $server->getErrorHandler();
     }
 
     public function onStop(): void
