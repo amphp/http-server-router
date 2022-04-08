@@ -37,7 +37,7 @@ final class Router implements RequestHandler
     public function __construct(
         HttpServer $httpServer,
         private readonly ErrorHandler $errorHandler,
-        int $cacheSize = self::DEFAULT_CACHE_SIZE
+        int $cacheSize = self::DEFAULT_CACHE_SIZE,
     ) {
         $httpServer->onStart($this->onStart(...));
         $httpServer->onStop($this->onStop(...));
@@ -94,7 +94,7 @@ final class Router implements RequestHandler
                 throw new \UnexpectedValueException(
                     "Encountered unexpected dispatcher code: " . $match[0]
                 );
-                // @codeCoverageIgnoreEnd
+            // @codeCoverageIgnoreEnd
         }
     }
 
@@ -177,14 +177,19 @@ final class Router implements RequestHandler
      * the trailing slash. Temporary redirects are used to redirect to the canonical URI
      * (with a trailing slash) to avoid search engine duplicate content penalties.
      *
-     * @param string    $method The HTTP method verb for which this route applies.
-     * @param string    $uri The string URI.
+     * @param string $method The HTTP method verb for which this route applies.
+     * @param string $uri The string URI.
      * @param RequestHandler $requestHandler Request handler invoked on a route match.
-     * @param Middleware[] ...$middlewares
+     * @param Middleware ...$middlewares
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
-    public function addRoute(string $method, string $uri, RequestHandler $requestHandler, Middleware ...$middlewares): void
+    public function addRoute(
+        string $method,
+        string $uri,
+        RequestHandler $requestHandler,
+        Middleware ...$middlewares,
+    ): void
     {
         if ($this->running) {
             throw new \Error(
@@ -214,7 +219,7 @@ final class Router implements RequestHandler
      * On repeated calls, the later call will wrap the passed middlewares around the previous stack. This ensures a
      * router can use `stack()` and then another entity can wrap a router with additional middlewares.
      *
-     * @param Middleware[] ...$middlewares
+     * @param Middleware ...$middlewares
      *
      * @throws \Error If the server has started.
      */
