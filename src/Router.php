@@ -245,7 +245,7 @@ final class Router implements RequestHandler
         $this->fallback = $requestHandler;
     }
 
-    public function onStart(HttpServer $server): void
+    private function onStart(): void
     {
         if ($this->running) {
             throw new \Error("Router already started");
@@ -296,7 +296,7 @@ final class Router implements RequestHandler
         });
     }
 
-    public function onStop(): void
+    private function onStop(): void
     {
         unset($this->routeDispatcher);
         $this->running = false;
