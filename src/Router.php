@@ -11,7 +11,7 @@ use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler
 {
-    const DEFAULT_CACHE_SIZE = 512;
+    private const DEFAULT_CACHE_SIZE = 512;
 
     private bool $running = false;
 
@@ -70,7 +70,7 @@ final class Router implements RequestHandler
                  * @var RequestHandler $requestHandler
                  * @var string[] $routeArgs
                  */
-                list(, $requestHandler, $routeArgs) = $match;
+                [, $requestHandler, $routeArgs] = $match;
                 $request->setAttribute(self::class, $routeArgs);
 
                 return $requestHandler->handleRequest($request);
