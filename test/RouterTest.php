@@ -13,7 +13,6 @@ use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
-use Amp\Http\Server\HttpServer;
 use Amp\Http\Server\SocketHttpServer;
 use Amp\Http\Status;
 use Amp\Socket\InternetAddress;

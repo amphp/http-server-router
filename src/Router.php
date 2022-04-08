@@ -51,10 +51,6 @@ final class Router implements RequestHandler
 
     /**
      * Route a request and dispatch it to the appropriate handler.
-     *
-     * @param Request $request
-     *
-     * @return Response
      */
     public function handleRequest(Request $request): Response
     {
@@ -100,10 +96,6 @@ final class Router implements RequestHandler
 
     /**
      * Create a response if no routes matched and no fallback has been set.
-     *
-     * @param Request $request
-     *
-     * @return Response
      */
     private function makeNotFoundResponse(Request $request): Response
     {
@@ -114,9 +106,6 @@ final class Router implements RequestHandler
      * Create a response if the requested method is not allowed for the matched path.
      *
      * @param string[] $methods
-     * @param Request $request
-     *
-     * @return Response
      */
     private function makeMethodNotAllowedResponse(array $methods, Request $request): Response
     {
@@ -180,7 +169,6 @@ final class Router implements RequestHandler
      * @param string $method The HTTP method verb for which this route applies.
      * @param string $uri The string URI.
      * @param RequestHandler $requestHandler Request handler invoked on a route match.
-     * @param Middleware ...$middlewares
      *
      * @throws \Error If the server has started, or if $method is empty.
      */
@@ -189,8 +177,7 @@ final class Router implements RequestHandler
         string $uri,
         RequestHandler $requestHandler,
         Middleware ...$middlewares,
-    ): void
-    {
+    ): void {
         if ($this->running) {
             throw new \Error(
                 "Cannot add routes once the server has started"
@@ -219,8 +206,6 @@ final class Router implements RequestHandler
      * On repeated calls, the later call will wrap the passed middlewares around the previous stack. This ensures a
      * router can use `stack()` and then another entity can wrap a router with additional middlewares.
      *
-     * @param Middleware ...$middlewares
-     *
      * @throws \Error If the server has started.
      */
     public function stack(Middleware ...$middlewares): void
@@ -236,8 +221,6 @@ final class Router implements RequestHandler
      * Specifies an instance of RequestHandler that is used if no routes match.
      *
      * If no fallback is given, a 404 response is returned from `respond()` when no matching routes are found.
-     *
-     * @param RequestHandler $requestHandler
      *
      * @throws \Error If the server has started.
      */
@@ -288,7 +271,7 @@ final class Router implements RequestHandler
                     $uri = "/";
                 }
 
-                if (str_ends_with($uri, "/?")) {
+                if (\str_ends_with($uri, "/?")) {
                     $canonicalUri = \substr($uri, 0, -2);
                     $redirectUri = \substr($uri, 0, -1);
 
