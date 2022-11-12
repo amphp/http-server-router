@@ -69,7 +69,7 @@ jobs:
         if: runner.os != 'Windows'
 
       - name: Install composer-require-checker
-        run: php -r 'file_put_contents("composer-require-checker.phar", file_get_contents("https://github.com/maglnet/ComposerRequireChecker/releases/download/3.7.0/composer-require-checker.phar"));'
+        run: php -r 'file_put_contents("composer-require-checker.phar", file_get_contents("https://github.com/maglnet/ComposerRequireChecker/releases/download/4.2.0/composer-require-checker.phar"));'
         if: runner.os != 'Windows' && matrix.composer-require-checker-version != 'none'
 
       - name: Run composer-require-checker
