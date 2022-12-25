@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Amp\Http\Server;
 
@@ -90,7 +90,7 @@ final class Router implements RequestHandler
                 throw new \UnexpectedValueException(
                     "Encountered unexpected dispatcher code: " . $match[0]
                 );
-            // @codeCoverageIgnoreEnd
+                // @codeCoverageIgnoreEnd
         }
     }
 
