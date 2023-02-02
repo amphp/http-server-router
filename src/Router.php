@@ -2,8 +2,8 @@
 
 namespace Amp\Http\Server;
 
+use Amp\Http\HttpStatus;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
-use Amp\Http\Status;
 use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
@@ -90,7 +90,7 @@ final class Router implements RequestHandler
                 throw new \UnexpectedValueException(
                     "Encountered unexpected dispatcher code: " . $match[0]
                 );
-            // @codeCoverageIgnoreEnd
+                // @codeCoverageIgnoreEnd
         }
     }
 
@@ -99,7 +99,7 @@ final class Router implements RequestHandler
      */
     private function makeNotFoundResponse(Request $request): Response
     {
-        return $this->errorHandler->handleError(Status::NOT_FOUND, null, $request);
+        return $this->errorHandler->handleError(HttpStatus::NOT_FOUND, null, $request);
     }
 
     /**
@@ -109,7 +109,7 @@ final class Router implements RequestHandler
      */
     private function makeMethodNotAllowedResponse(array $methods, Request $request): Response
     {
-        $response = $this->errorHandler->handleError(Status::METHOD_NOT_ALLOWED, null, $request);
+        $response = $this->errorHandler->handleError(HttpStatus::METHOD_NOT_ALLOWED, null, $request);
         $response->setHeader("allow", \implode(", ", $methods));
         return $response;
     }
@@ -256,7 +256,7 @@ final class Router implements RequestHandler
                     $redirectTo = $path;
                 }
 
-                return new Response(Status::PERMANENT_REDIRECT, [
+                return new Response(HttpStatus::PERMANENT_REDIRECT, [
                     "location" => $redirectTo,
                     "content-type" => "text/plain; charset=utf-8",
                 ], "Canonical resource location: {$path}");
