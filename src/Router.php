@@ -2,9 +2,9 @@
 
 namespace Amp\Http\Server;
 
+use Amp\Cache\LocalCache;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
-use cash\LRUCache;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 use function FastRoute\simpleDispatcher;
@@ -27,7 +27,7 @@ final class Router implements RequestHandler
 
     private string $prefix = "/";
 
-    private readonly LRUCache $cache;
+    private readonly LocalCache $cache;
 
     /**
      * @param int $cacheSize Maximum number of route matches to cache.
@@ -46,7 +46,7 @@ final class Router implements RequestHandler
             throw new \ValueError("The number of cache entries must be greater than zero");
         }
 
-        $this->cache = new LRUCache($cacheSize);
+        $this->cache = new LocalCache($cacheSize);
     }
 
     /**
@@ -61,7 +61,7 @@ final class Router implements RequestHandler
 
         if (null === $match = $this->cache->get($toMatch)) {
             $match = $this->routeDispatcher->dispatch($method, $path);
-            $this->cache->put($toMatch, $match);
+            $this->cache->set($toMatch, $match);
         }
 
         switch ($match[0]) {
