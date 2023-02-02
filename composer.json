@@ -28,7 +28,7 @@
     "require": {
         "php": ">=8.1",
         "amphp/http-server": "^3",
-        "amphp/http": "^1",
+        "amphp/http": "^2-dev",
         "amphp/socket": "^2",
         "nikic/fast-route": "^1",
         "cash/lrucache": "^1"
