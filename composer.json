@@ -27,11 +27,11 @@
     ],
     "require": {
         "php": ">=8.1",
+        "amphp/cache": "^2",
         "amphp/http-server": "^3",
         "amphp/http": "^2-dev",
         "amphp/socket": "^2",
-        "nikic/fast-route": "^1",
-        "cash/lrucache": "^1"
+        "nikic/fast-route": "^1"
     },
     "require-dev": {
         "amphp/log": "^2",
