@@ -39,7 +39,7 @@
         "amphp/php-cs-fixer-config": "^2",
         "league/uri": "^6",
         "phpunit/phpunit": "^9",
-        "psalm/phar": "^4.22"
+        "psalm/phar": "^5.6"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
