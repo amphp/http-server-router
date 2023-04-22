@@ -24,12 +24,12 @@ Matched route arguments are available in the request attributes under the `Amp\H
 $router = new Router;
 
 $router->addRoute('GET', '/', new CallableRequestHandler(function () {
-    return new Response(Status::OK, ['content-type' => 'text/plain'], 'Hello, world!');
+    return new Response(HttpStatus::OK, ['content-type' => 'text/plain'], 'Hello, world!');
 }));
 
 $router->addRoute('GET', '/{name}', new CallableRequestHandler(function (Request $request) {
     $args = $request->getAttribute(Router::class);
-    return new Response(Status::OK, ['content-type' => 'text/plain'], "Hello, {$args['name']}!");
+    return new Response(HttpStatus::OK, ['content-type' => 'text/plain'], "Hello, {$args['name']}!");
 }));
 ```
 

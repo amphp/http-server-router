@@ -41,7 +41,7 @@
         "phpunit/phpunit": "^9",
         "psalm/phar": "^5.6"
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "beta",
     "prefer-stable": true,
     "autoload": {
         "psr-4": {

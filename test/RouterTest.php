@@ -4,6 +4,7 @@ namespace Amp\Http\Server\Router\Test;
 
 use Amp\ByteStream\Payload;
 use Amp\CompositeException;
+use Amp\Http\HttpStatus;
 use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\Driver\Client;
 use Amp\Http\Server\ErrorHandler;
@@ -14,7 +15,6 @@ use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Http\Server\Response;
 use Amp\Http\Server\Router;
 use Amp\Http\Server\SocketHttpServer;
-use Amp\Http\Status;
 use Amp\Socket\InternetAddress;
 use League\Uri;
 use PHPUnit\Framework\TestCase;
@@ -35,7 +35,7 @@ class RouterTest extends TestCase
 
     protected function createMockServer(): SocketHttpServer
     {
-        $server = new SocketHttpServer(new NullLogger);
+        $server = SocketHttpServer::createForDirectAccess(new NullLogger);
         $server->expose(new InternetAddress('127.0.0.1', 0));
         return $server;
     }
@@ -88,14 +88,14 @@ class RouterTest extends TestCase
 
         $response = $router->handleRequest($request);
 
-        $this->assertEquals(Status::PERMANENT_REDIRECT, $response->getStatus());
+        $this->assertEquals(HttpStatus::PERMANENT_REDIRECT, $response->getStatus());
         $this->assertEquals("/amphp/bob/19", $response->getHeader("location"));
 
         // Test that response is handled and no redirection
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/amphp/bob/19"));
         $response = $router->handleRequest($request);
 
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
         $this->assertSame(["name" => "bob", "age" => "19"], $routeArgs);
     }
 
@@ -114,7 +114,7 @@ class RouterTest extends TestCase
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/github/amphp/bob"));
         $response = $router->handleRequest($request);
 
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
         $this->assertSame(["name" => "bob"], $routeArgs);
     }
 
@@ -122,7 +122,7 @@ class RouterTest extends TestCase
     {
         $router = new Router($this->server, $this->errorHandler);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
-            return new Response(Status::OK, [], $req->getAttribute("stack"));
+            return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
@@ -144,7 +144,7 @@ class RouterTest extends TestCase
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         $response = $router->handleRequest($request);
 
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
         $payload = new Payload($response->getBody());
         $this->assertSame("ab", $payload->buffer());
     }
@@ -153,7 +153,7 @@ class RouterTest extends TestCase
     {
         $router = new Router($this->server, $this->errorHandler);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
-            return new Response(Status::OK, [], $req->getAttribute("stack"));
+            return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
         $router->stack(new class implements Middleware {
@@ -177,7 +177,7 @@ class RouterTest extends TestCase
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/"));
         $response = $router->handleRequest($request);
 
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
         $payload = new Payload($response->getBody());
         $this->assertSame("ab", $payload->buffer());
     }
@@ -185,7 +185,7 @@ class RouterTest extends TestCase
     public function testMerge(): void
     {
         $requestHandler = new ClosureRequestHandler(function (Request $req) {
-            return new Response(Status::OK, [], $req->getUri()->getPath());
+            return new Response(HttpStatus::OK, [], $req->getUri()->getPath());
         });
 
         $routerA = new Router($this->server, $this->createErrorHandler());
@@ -202,21 +202,21 @@ class RouterTest extends TestCase
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/bob"));
         $response = $routerA->handleRequest($request);
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/a/b/bob"));
         $response = $routerA->handleRequest($request);
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/b/bob"));
         $response = $routerA->handleRequest($request);
-        $this->assertEquals(Status::NOT_FOUND, $response->getStatus());
+        $this->assertEquals(HttpStatus::NOT_FOUND, $response->getStatus());
     }
 
     public function testPathIsMatchedDecoded(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -228,17 +228,17 @@ class RouterTest extends TestCase
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString($uri));
         $response = $router->handleRequest($request);
-        $this->assertEquals(Status::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
     }
 
     public function testFallbackInvokedOnNotFoundRoute(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $fallback = new ClosureRequestHandler(function () {
-            return new Response(Status::NO_CONTENT);
+            return new Response(HttpStatus::NO_CONTENT);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -249,13 +249,13 @@ class RouterTest extends TestCase
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString("/bar"));
         $response = $router->handleRequest($request);
-        $this->assertEquals(Status::NO_CONTENT, $response->getStatus());
+        $this->assertEquals(HttpStatus::NO_CONTENT, $response->getStatus());
     }
 
     public function testNonAllowedMethod(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -266,14 +266,14 @@ class RouterTest extends TestCase
 
         $request = new Request($this->createMock(Client::class), "POST", Uri\Http::createFromString("/foo/bar"));
         $response = $router->handleRequest($request);
-        $this->assertEquals(Status::METHOD_NOT_ALLOWED, $response->getStatus());
+        $this->assertEquals(HttpStatus::METHOD_NOT_ALLOWED, $response->getStatus());
         $this->assertSame('GET, DELETE', $response->getHeader('allow'));
     }
 
     public function testMergeAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $mockServer = $this->createMockServer();
@@ -291,7 +291,7 @@ class RouterTest extends TestCase
     public function testPrefixAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -307,7 +307,7 @@ class RouterTest extends TestCase
     public function testAddRouteAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -323,7 +323,7 @@ class RouterTest extends TestCase
     public function testStackAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
@@ -339,7 +339,7 @@ class RouterTest extends TestCase
     public function testSetFallbackAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
-            return new Response(Status::OK);
+            return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->errorHandler);
