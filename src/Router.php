@@ -15,7 +15,7 @@ final class Router implements RequestHandler
 
     private bool $running = false;
 
-    private Dispatcher $routeDispatcher;
+    private ?Dispatcher $routeDispatcher = null;
 
     private ?RequestHandler $fallback = null;
 
@@ -54,6 +54,10 @@ final class Router implements RequestHandler
      */
     public function handleRequest(Request $request): Response
     {
+        if (!$this->routeDispatcher) {
+            throw new \Error('HTTP server has not been started so the router has not been built');
+        }
+
         $method = $request->getMethod();
         $path = \rawurldecode($request->getUri()->getPath());
 
