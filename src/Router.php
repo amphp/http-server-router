@@ -3,6 +3,8 @@
 namespace Amp\Http\Server;
 
 use Amp\Cache\LocalCache;
+use Amp\ForbidCloning;
+use Amp\ForbidSerialization;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use FastRoute\Dispatcher;
@@ -11,6 +13,9 @@ use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler
 {
+    use ForbidCloning;
+    use ForbidSerialization;
+
     private const DEFAULT_CACHE_SIZE = 512;
 
     private bool $running = false;
