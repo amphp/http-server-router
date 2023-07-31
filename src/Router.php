@@ -24,18 +24,19 @@ final class Router implements RequestHandler
 
     private ?RequestHandler $fallback = null;
 
-    /** @var array[] */
+    /** @var list<array{string, string, RequestHandler}> */
     private array $routes = [];
 
-    /** @var Middleware[] */
+    /** @var list<Middleware> */
     private array $middlewares = [];
 
     private string $prefix = "/";
 
+    /** @var LocalCache<array{int, RequestHandler, array<string, string>}> */
     private readonly LocalCache $cache;
 
     /**
-     * @param int $cacheSize Maximum number of route matches to cache.
+     * @param positive-int $cacheSize Maximum number of route matches to cache.
      *
      * @throws \Error If `$cacheSize` is less than zero.
      */
@@ -47,6 +48,7 @@ final class Router implements RequestHandler
         $httpServer->onStart($this->onStart(...));
         $httpServer->onStop($this->onStop(...));
 
+        /** @psalm-suppress DocblockTypeContradiction */
         if ($cacheSize <= 0) {
             throw new \ValueError("The number of cache entries must be greater than zero");
         }
@@ -77,7 +79,7 @@ final class Router implements RequestHandler
             case Dispatcher::FOUND:
                 /**
                  * @var RequestHandler $requestHandler
-                 * @var string[] $routeArgs
+                 * @var array<string, string> $routeArgs
                  */
                 [, $requestHandler, $routeArgs] = $match;
                 $request->setAttribute(self::class, $routeArgs);
@@ -126,8 +128,6 @@ final class Router implements RequestHandler
     /**
      * Merge another router's routes into this router.
      *
-     * Doing so might improve performance for request dispatching.
-     *
      * @param self $router Router to merge.
      */
     public function merge(self $router): void
@@ -136,10 +136,10 @@ final class Router implements RequestHandler
             throw new \Error("Cannot merge routers after the server has started");
         }
 
-        foreach ($router->routes as $route) {
-            $route[1] = \ltrim($router->prefix, "/") . $route[1];
-            $route[2] = Middleware\stack($route[2], ...$router->middlewares);
-            $this->routes[] = $route;
+        foreach ($router->routes as [$method, $path, $requestHandler]) {
+            $path = \ltrim($router->prefix, "/") . $path;
+            $requestHandler = Middleware\stackMiddleware($requestHandler, ...$router->middlewares);
+            $this->routes[] = [$method, $path, $requestHandler];
         }
     }
 
@@ -200,7 +200,7 @@ final class Router implements RequestHandler
         }
 
         if (!empty($middlewares)) {
-            $requestHandler = Middleware\stack($requestHandler, ...$middlewares);
+            $requestHandler = Middleware\stackMiddleware($requestHandler, ...$middlewares);
         }
 
         $this->routes[] = [$method, \ltrim($uri, "/"), $requestHandler];
@@ -223,7 +223,7 @@ final class Router implements RequestHandler
             throw new \Error("Cannot set middlewares after the server has started");
         }
 
-        $this->middlewares = \array_merge($middlewares, $this->middlewares);
+        $this->middlewares = [...\array_values($middlewares), ...$this->middlewares];
     }
 
     /**
@@ -272,7 +272,7 @@ final class Router implements RequestHandler
             });
 
             foreach ($this->routes as [$method, $uri, $requestHandler]) {
-                $requestHandler = Middleware\stack($requestHandler, ...$this->middlewares);
+                $requestHandler = Middleware\stackMiddleware($requestHandler, ...$this->middlewares);
                 $uri = $this->prefix . $uri;
 
                 // Special-case, otherwise we redirect just to the same URI again
