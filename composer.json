@@ -32,7 +32,8 @@
         "amphp/http": "^2",
         "amphp/http-server": "^3",
         "amphp/socket": "^2",
-        "nikic/fast-route": "^1"
+        "nikic/fast-route": "^1",
+        "psr/log": "^1|^2|^3"
     },
     "require-dev": {
         "amphp/log": "^2",
