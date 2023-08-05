@@ -1,10 +1,12 @@
 # http-server-router
 
-This package provides a routing `RequestHandler` for [Amp's HTTP server](https://github.com/amphp/http-server) based on the request URI and method using [FastRoute](https://github.com/nikic/FastRoute).
+AMPHP is a collection of event-driven libraries for PHP designed with fibers and concurrency in mind.
+This package provides a routing `RequestHandler` for [`amphp/http-server`](https://github.com/amphp/http-server) based on the request path and method using [FastRoute](https://github.com/nikic/FastRoute).
 
 ## Installation
 
 This package can be installed as a [Composer](https://getcomposer.org/) dependency.
+You should specify `amphp/http-server` as a separate dependency.
 
 ```bash
 composer require amphp/http-server-router
@@ -14,7 +16,7 @@ composer require amphp/http-server-router
 
 **`Router`** implements `RequestHandler`, which is used by an [`HttpServer`](https://github.com/amphp/http-server#creating-an-http-server) to handle incoming requests. Incoming requests are routed by `Router` to other `RequestHandler`s based on the request path.
 
-Routes can be defined using the `addRoute($method, $uri, $requestHandler, ...$middeware)` method.
+Routes can be defined using the `addRoute($method, $uri, $requestHandler)` method.
 
 ```php
 public function addRoute(
@@ -26,18 +28,20 @@ public function addRoute(
 ```
 
 Matched route arguments are available in the request attributes under the `Amp\Http\Server\Router` key as an associative array.
-
-Middleware provided to `addRoute()` will only be applied to the given route.
-
 Please read the [FastRoute documentation on how to define placeholders](https://github.com/nikic/FastRoute#defining-routes).
 
 ### Middleware
 
-In addition to specifying middlewares by route with `addRoute()`, you may wrap all routes with a common set of middlware using `stackMiddleware(...$middleware)`.
+You can stack all routes with a common set of middleware using `addMiddleware($middleware)`.
+Each middleware is called in the order of the `addMiddleware()` calls.
+The router will not invoke any middleware for the fallback handler.
 
 ```php
-public function stackMiddleware(Middleware ...$middlewares): void
+public function addMiddleware(Middleware $middleware): void
 ```
+
+> **Note**
+> Per-route middleware can be added by using `Amp\Http\Server\Middleware\stackMiddleware()` before passing the `RequestHandler` to `addRoute()`.
 
 ### Fallback
 

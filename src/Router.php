@@ -172,8 +172,7 @@ final class Router implements RequestHandler
     public function addRoute(
         string $method,
         string $uri,
-        RequestHandler $requestHandler,
-        Middleware ...$middlewares,
+        RequestHandler $requestHandler
     ): void {
         if ($this->running) {
             throw new \Error(
@@ -185,10 +184,6 @@ final class Router implements RequestHandler
             throw new \Error(
                 __METHOD__ . "() requires a non-empty string HTTP method at Argument 1"
             );
-        }
-
-        if (!empty($middlewares)) {
-            $requestHandler = Middleware\stackMiddleware($requestHandler, ...$middlewares);
         }
 
         $this->routes[] = [$method, \ltrim($uri, "/"), $requestHandler];
