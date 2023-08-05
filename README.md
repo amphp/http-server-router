@@ -51,7 +51,7 @@ public function setFallback(RequestHandler $requestHandler): void
 ```
 
 > **Note**
-> Middleware defined by `Router::stackMiddleware()` will _not_ be invoked when a request is forwarded to fallback handler. Use `Amp\Http\Server\Middleware\stackMiddleware()` to wrap the fallback request handler with any middlewares needed first.
+> Middleware defined by `Router::addMiddleware()` will _not_ be invoked when a request is forwarded to fallback handler. Use `Amp\Http\Server\Middleware\stackMiddleware()` to wrap the fallback request handler with any middlewares needed first.
 
 ## Example
 
