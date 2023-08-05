@@ -22,8 +22,7 @@ Routes can be defined using the `addRoute($method, $uri, $requestHandler)` metho
 public function addRoute(
     string $method,
     string $uri,
-    RequestHandler $requestHandler,
-    Middleware ...$middlewares,
+    RequestHandler $requestHandler
 ): void
 ```
 
