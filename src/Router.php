@@ -90,10 +90,10 @@ final class Router implements RequestHandler
                     return $this->fallback->handleRequest($request);
                 }
 
-                return $this->makeNotFoundResponse($request);
+                return $this->notFound($request);
 
             case Dispatcher::METHOD_NOT_ALLOWED:
-                return $this->makeMethodNotAllowedResponse($match[1], $request);
+                return $this->methodNotAllowed($match[1], $request);
 
             default:
                 // @codeCoverageIgnoreStart
@@ -102,26 +102,6 @@ final class Router implements RequestHandler
                 );
                 // @codeCoverageIgnoreEnd
         }
-    }
-
-    /**
-     * Create a response if no routes matched and no fallback has been set.
-     */
-    private function makeNotFoundResponse(Request $request): Response
-    {
-        return $this->errorHandler->handleError(HttpStatus::NOT_FOUND, null, $request);
-    }
-
-    /**
-     * Create a response if the requested method is not allowed for the matched path.
-     *
-     * @param string[] $methods
-     */
-    private function makeMethodNotAllowedResponse(array $methods, Request $request): Response
-    {
-        $response = $this->errorHandler->handleError(HttpStatus::METHOD_NOT_ALLOWED, null, $request);
-        $response->setHeader("allow", \implode(", ", $methods));
-        return $response;
     }
 
     /**
@@ -240,6 +220,26 @@ final class Router implements RequestHandler
         }
 
         $this->fallback = $requestHandler;
+    }
+
+    /**
+     * Create a response if no routes matched and no fallback has been set.
+     */
+    private function notFound(Request $request): Response
+    {
+        return $this->errorHandler->handleError(HttpStatus::NOT_FOUND, null, $request);
+    }
+
+    /**
+     * Create a response if the requested method is not allowed for the matched path.
+     *
+     * @param string[] $methods
+     */
+    private function methodNotAllowed(array $methods, Request $request): Response
+    {
+        $response = $this->errorHandler->handleError(HttpStatus::METHOD_NOT_ALLOWED, null, $request);
+        $response->setHeader("allow", \implode(", ", $methods));
+        return $response;
     }
 
     private function onStart(): void
