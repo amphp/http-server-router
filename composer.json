@@ -43,8 +43,6 @@
         "psalm/phar": "^5.6",
         "colinodell/psr-testlogger": "^1.2"
     },
-    "minimum-stability": "beta",
-    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "Amp\\Http\\Server\\": "src"
