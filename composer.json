@@ -1,7 +1,7 @@
 {
     "name": "amphp/http-server-router",
     "homepage": "https://github.com/amphp/http-server-router",
-    "description": "Router responder for Amp's HTTP server.",
+    "description": "Routes to request handlers based on HTTP method and path for amphp/http-server.",
     "keywords": [
         "http",
         "server",
