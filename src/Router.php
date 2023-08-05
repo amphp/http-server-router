@@ -217,7 +217,7 @@ final class Router implements RequestHandler
      *
      * @throws \Error If the server has started.
      */
-    public function stack(Middleware ...$middlewares): void
+    public function stackMiddleware(Middleware ...$middlewares): void
     {
         if ($this->running) {
             throw new \Error("Cannot set middlewares after the server has started");

@@ -125,7 +125,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
-        $router->stack(new class implements Middleware {
+        $router->stackMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
                 $request->setAttribute("stack", "a");
@@ -156,7 +156,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
-        $router->stack(new class implements Middleware {
+        $router->stackMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
@@ -164,7 +164,7 @@ class RouterTest extends TestCase
             }
         });
 
-        $router->stack(new class implements Middleware {
+        $router->stackMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
                 $request->setAttribute("stack", "a");
@@ -333,7 +333,7 @@ class RouterTest extends TestCase
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot set middlewares');
-        $router->stack(new Middleware\CompressionMiddleware);
+        $router->stackMiddleware(new Middleware\CompressionMiddleware);
     }
 
     public function testSetFallbackAfterStart(): void
