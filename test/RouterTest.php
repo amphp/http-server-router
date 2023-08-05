@@ -117,13 +117,15 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
-        $router->stackMiddleware(new class implements Middleware {
+        $router->addMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
                 $request->setAttribute("stack", "a");
                 return $requestHandler->handleRequest($request);
             }
-        }, new class implements Middleware {
+        });
+
+        $router->addMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
                 $request->setAttribute("stack", $request->getAttribute("stack") . "b");
@@ -148,18 +150,18 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
 
-        $router->stackMiddleware(new class implements Middleware {
+        $router->addMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
-                $request->setAttribute("stack", $request->getAttribute("stack") . "b");
+                $request->setAttribute("stack", "a");
                 return $requestHandler->handleRequest($request);
             }
         });
 
-        $router->stackMiddleware(new class implements Middleware {
+        $router->addMiddleware(new class implements Middleware {
             public function handleRequest(Request $request, RequestHandler $requestHandler): Response
             {
-                $request->setAttribute("stack", "a");
+                $request->setAttribute("stack", $request->getAttribute("stack") . "b");
                 return $requestHandler->handleRequest($request);
             }
         });
@@ -325,7 +327,7 @@ class RouterTest extends TestCase
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot set middlewares');
-        $router->stackMiddleware(new Middleware\CompressionMiddleware);
+        $router->addMiddleware(new Middleware\CompressionMiddleware);
     }
 
     public function testSetFallbackAfterStart(): void
