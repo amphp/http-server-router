@@ -51,7 +51,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Amp\\Http\\Server\\Router\\Test\\": "test"
+            "Amp\\Http\\Server\\": "test"
         }
     },
     "scripts": {

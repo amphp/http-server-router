@@ -1,20 +1,12 @@
 <?php declare(strict_types=1);
 
-namespace Amp\Http\Server\Router\Test;
+namespace Amp\Http\Server;
 
 use Amp\ByteStream\Payload;
 use Amp\CompositeException;
 use Amp\Http\HttpStatus;
-use Amp\Http\Server\DefaultErrorHandler;
 use Amp\Http\Server\Driver\Client;
-use Amp\Http\Server\ErrorHandler;
-use Amp\Http\Server\Middleware;
-use Amp\Http\Server\Request;
-use Amp\Http\Server\RequestHandler;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
-use Amp\Http\Server\Response;
-use Amp\Http\Server\Router;
-use Amp\Http\Server\SocketHttpServer;
 use Amp\Socket\InternetAddress;
 use League\Uri;
 use PHPUnit\Framework\TestCase;
