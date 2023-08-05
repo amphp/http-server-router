@@ -3,31 +3,32 @@
 namespace Amp\Http\Server;
 
 use Amp\ByteStream\Payload;
-use Amp\CompositeException;
 use Amp\Http\HttpStatus;
 use Amp\Http\Server\Driver\Client;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use Amp\Socket\InternetAddress;
+use ColinODell\PsrTestLogger\TestLogger;
 use League\Uri;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 class RouterTest extends TestCase
 {
     private SocketHttpServer $server;
     private ErrorHandler $errorHandler;
+    private TestLogger $testLogger;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->testLogger = new TestLogger();
         $this->server = $this->createMockServer();
         $this->errorHandler = $this->createErrorHandler();
     }
 
     protected function createMockServer(): SocketHttpServer
     {
-        $server = SocketHttpServer::createForDirectAccess(new NullLogger);
+        $server = SocketHttpServer::createForDirectAccess($this->testLogger);
         $server->expose(new InternetAddress('127.0.0.1', 0));
         return $server;
     }
@@ -41,7 +42,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(\Error::class);
 
-        new Router($this->createMockServer(), $this->createErrorHandler(), 0);
+        new Router($this->server, $this->testLogger, $this->errorHandler, 0);
     }
 
     public function testRouteThrowsOnEmptyMethodString(): void
@@ -49,24 +50,23 @@ class RouterTest extends TestCase
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Amp\Http\Server\Router::addRoute() requires a non-empty string HTTP method at Argument 1');
 
-        $router = new Router($this->createMockServer(), $this->createErrorHandler());
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("", "/uri", new ClosureRequestHandler(function () {
         }));
     }
 
-    public function testUpdateFailsIfStartedWithoutAnyRoutes(): void
+    public function testLogsMessageWithoutAnyRoutes(): void
     {
-        $router = new Router($this->server, $this->errorHandler);
-
-        $this->expectException(CompositeException::class);
-        $this->expectExceptionMessage("Router start failure: no routes registered");
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
 
         $this->server->start($router, $this->errorHandler);
+
+        self::assertTrue($this->testLogger->hasNotice('No routes registered'));
     }
 
     public function testUseCanonicalRedirector(): void
     {
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/{name}/{age}/?", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
@@ -93,7 +93,7 @@ class RouterTest extends TestCase
 
     public function testMultiplePrefixes(): void
     {
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "{name}", new ClosureRequestHandler(function (Request $req) use (&$routeArgs) {
             $routeArgs = $req->getAttribute(Router::class);
             return new Response;
@@ -112,7 +112,7 @@ class RouterTest extends TestCase
 
     public function testStack(): void
     {
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
@@ -143,7 +143,7 @@ class RouterTest extends TestCase
 
     public function testStackMultipleCalls(): void
     {
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/", new ClosureRequestHandler(function (Request $req) {
             return new Response(HttpStatus::OK, [], $req->getAttribute("stack"));
         }));
@@ -180,11 +180,11 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK, [], $req->getUri()->getPath());
         });
 
-        $routerA = new Router($this->server, $this->createErrorHandler());
+        $routerA = new Router($this->server, $this->testLogger, $this->createErrorHandler());
         $routerA->prefix("a");
         $routerA->addRoute("GET", "{name}", $requestHandler);
 
-        $routerB = new Router($this->server, $this->createErrorHandler());
+        $routerB = new Router($this->server, $this->testLogger, $this->createErrorHandler());
         $routerB->prefix("b");
         $routerB->addRoute("GET", "{name}", $requestHandler);
 
@@ -211,7 +211,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/fo+ö", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
@@ -233,7 +233,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::NO_CONTENT);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
         $router->setFallback($fallback);
 
@@ -250,7 +250,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
         $router->addRoute("DELETE", "/foo/{name}", $requestHandler);
 
@@ -270,14 +270,14 @@ class RouterTest extends TestCase
 
         $mockServer = $this->createMockServer();
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
 
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot merge routers after');
-        $router->merge(new Router($mockServer, $this->createErrorHandler()));
+        $router->merge(new Router($mockServer, $this->testLogger, $this->createErrorHandler()));
     }
 
     public function testPrefixAfterStart(): void
@@ -286,7 +286,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
@@ -302,7 +302,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
@@ -318,7 +318,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
@@ -334,7 +334,7 @@ class RouterTest extends TestCase
             return new Response(HttpStatus::OK);
         });
 
-        $router = new Router($this->server, $this->errorHandler);
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("GET", "/foo/{name}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);

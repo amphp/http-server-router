@@ -9,6 +9,7 @@ use Amp\Http\HttpStatus;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
+use Psr\Log\LoggerInterface;
 use function Amp\Http\Server\Middleware\stackMiddleware;
 use function FastRoute\simpleDispatcher;
 
@@ -41,6 +42,7 @@ final class Router implements RequestHandler
      */
     public function __construct(
         HttpServer $httpServer,
+        private readonly LoggerInterface $logger,
         private readonly ErrorHandler $errorHandler,
         int $cacheSize = self::DEFAULT_CACHE_SIZE,
     ) {
@@ -60,8 +62,16 @@ final class Router implements RequestHandler
      */
     public function handleRequest(Request $request): Response
     {
-        if (!$this->routeDispatcher) {
+        if (!$this->running) {
             throw new \Error('HTTP server has not been started so the router has not been built');
+        }
+
+        if (!$this->routeDispatcher) {
+            if ($this->fallback !== null) {
+                return $this->fallback->handleRequest($request);
+            }
+
+            return $this->notFound($request);
         }
 
         $method = $request->getMethod();
@@ -248,11 +258,12 @@ final class Router implements RequestHandler
             throw new \Error("Router already started");
         }
 
-        if (empty($this->routes)) {
-            throw new \Error("Router start failure: no routes registered");
-        }
-
         $this->running = true;
+
+        if (!$this->routes) {
+            $this->logger->notice("No routes registered");
+            return;
+        }
 
         $this->routeDispatcher = simpleDispatcher(function (RouteCollector $rc): void {
             $redirectHandler = new ClosureRequestHandler(static function (Request $request): Response {
@@ -295,7 +306,7 @@ final class Router implements RequestHandler
 
     private function onStop(): void
     {
-        unset($this->routeDispatcher);
+        $this->routeDispatcher = null;
         $this->running = false;
     }
 }

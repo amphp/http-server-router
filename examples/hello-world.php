@@ -32,7 +32,7 @@ $server->expose(new Socket\InternetAddress("[::]", 1337));
 
 $errorHandler = new DefaultErrorHandler();
 
-$router = new Router($server, $errorHandler);
+$router = new Router($server, $logger, $errorHandler);
 $router->addRoute('GET', '/', new ClosureRequestHandler(function () {
     return new Response(HttpStatus::OK, ['content-type' => 'text/plain'], 'Hello, world!');
 }));
