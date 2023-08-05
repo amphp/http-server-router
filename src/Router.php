@@ -9,6 +9,7 @@ use Amp\Http\HttpStatus;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
+use function Amp\Http\Server\Middleware\stackMiddleware;
 use function FastRoute\simpleDispatcher;
 
 final class Router implements RequestHandler
@@ -37,8 +38,6 @@ final class Router implements RequestHandler
 
     /**
      * @param positive-int $cacheSize Maximum number of route matches to cache.
-     *
-     * @throws \Error If `$cacheSize` is less than zero.
      */
     public function __construct(
         HttpServer $httpServer,
@@ -213,7 +212,7 @@ final class Router implements RequestHandler
      * All middlewares are called in the order they're passed, so the first middleware is the outer middleware.
      *
      * On repeated calls, the later call will wrap the passed middlewares around the previous stack. This ensures a
-     * router can use `stack()` and then another entity can wrap a router with additional middlewares.
+     * router can use {@see stackMiddleware()} and then another entity can wrap a router with additional middlewares.
      *
      * @throws \Error If the server has started.
      */
@@ -227,9 +226,10 @@ final class Router implements RequestHandler
     }
 
     /**
-     * Specifies an instance of RequestHandler that is used if no routes match.
+     * Specifies an instance of {@see RequestHandler} that is used if no routes match.
      *
-     * If no fallback is given, a 404 response is returned from `respond()` when no matching routes are found.
+     * If no fallback is given, a 404 response is returned from {@see handleRequest()} when no matching routes are
+     * found.
      *
      * @throws \Error If the server has started.
      */
