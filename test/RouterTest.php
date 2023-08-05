@@ -314,7 +314,7 @@ class RouterTest extends TestCase
         $router->addRoute("GET", "/foo", $requestHandler);
     }
 
-    public function testStackAfterStart(): void
+    public function testAddAfterStart(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
             return new Response(HttpStatus::OK);
@@ -326,7 +326,7 @@ class RouterTest extends TestCase
         $this->server->start($router, $this->errorHandler);
 
         $this->expectException(\Error::class);
-        $this->expectExceptionMessage('Cannot set middlewares');
+        $this->expectExceptionMessage('Cannot add middleware after the server has started');
         $router->addMiddleware(new Middleware\CompressionMiddleware);
     }
 
