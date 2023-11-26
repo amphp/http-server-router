@@ -68,7 +68,7 @@ use Amp\Http\Server\SocketHttpServer;
 $server = SocketHttpServer::createForDirectAccess($logger);
 $errorHandler = new DefaultErrorHandler();
 
-$router = new Router($server, $errorHandler);
+$router = new Router($server, $logger, $errorHandler);
 
 $router->addRoute('GET', '/', new ClosureRequestHandler(
     function () {
