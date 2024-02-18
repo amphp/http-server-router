@@ -6,13 +6,18 @@ use Amp\Cache\LocalCache;
 use Amp\ForbidCloning;
 use Amp\ForbidSerialization;
 use Amp\Http\HttpStatus;
+use Amp\Http\Server\Driver\Client;
+use Amp\Http\Server\Driver\HttpDriver;
+use Amp\Http\Server\Driver\HttpDriverFactory;
+use Amp\Http\Server\Driver\HttpDriverMergedFactory;
+use Amp\Http\Server\Driver\HttpDriverMiddleware;
 use Amp\Http\Server\RequestHandler\ClosureRequestHandler;
 use FastRoute\Dispatcher;
 use FastRoute\RouteCollector;
 use Psr\Log\LoggerInterface;
 use function FastRoute\simpleDispatcher;
 
-final class Router implements RequestHandler
+final class Router implements RequestHandler, HttpDriverMiddleware
 {
     use ForbidCloning;
     use ForbidSerialization;
@@ -111,6 +116,26 @@ final class Router implements RequestHandler
                 );
                 // @codeCoverageIgnoreEnd
         }
+    }
+
+    public function createHttpDriver(HttpDriverFactory $factory, RequestHandler $requestHandler, ErrorHandler $errorHandler, Client $client): HttpDriver
+    {
+        $middlewares = [];
+        foreach ($this->routes as [, , $routeHandler]) {
+            if ($requestHandler instanceof HttpDriverMiddleware) {
+                $middlewares[] = $routeHandler;
+            }
+        }
+
+        if ($middlewares) {
+            if (count($middlewares) == 1) {
+                return $middlewares[0]->createHttpDriver($factory, $requestHandler, $errorHandler, $client);
+            }
+
+            $factory = new HttpDriverMergedFactory($middlewares, $factory);
+        }
+
+        return $factory->createHttpDriver($requestHandler, $errorHandler, $client);
     }
 
     /**
