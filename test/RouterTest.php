@@ -42,7 +42,7 @@ class RouterTest extends TestCase
     {
         $this->expectException(\Error::class);
 
-        new Router($this->server, $this->testLogger, $this->errorHandler, 0);
+        (new Router($this->server, $this->testLogger, $this->errorHandler, 0));
     }
 
     public function testRouteThrowsOnEmptyMethodString(): void
@@ -52,6 +52,7 @@ class RouterTest extends TestCase
 
         $router = new Router($this->server, $this->testLogger, $this->errorHandler);
         $router->addRoute("", "/uri", new ClosureRequestHandler(function () {
+            // empty handler
         }));
     }
 
@@ -344,5 +345,66 @@ class RouterTest extends TestCase
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot add fallback');
         $router->setFallback($requestHandler);
+    }
+
+    public function testHandleOptionsRequestWhenRouteIsNotMatched(): void
+    {
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
+
+        $this->server->start($router, $this->errorHandler);
+
+        $request = new Request($this->createMock(Client::class), Router::OPTIONS_METHOD, Uri\Http::createFromString("/foo/bar"));
+        $response = $router->handleRequest($request);
+        $this->assertEquals(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertNull($response->getHeader('allow'));
+    }
+
+    public function testHandleOptionsRequestWithoutMiddlewares(): void
+    {
+        $requestHandler = new ClosureRequestHandler(function () {
+            return new Response(HttpStatus::OK);
+        });
+
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        $this->server->start($router, $this->errorHandler);
+
+        $request = new Request($this->createMock(Client::class), Router::OPTIONS_METHOD, Uri\Http::createFromString("/foo/bar"));
+        $response = $router->handleRequest($request);
+        $this->assertEquals(HttpStatus::METHOD_NOT_ALLOWED, $response->getStatus());
+        $this->assertSame('GET', $response->getHeader('allow'));
+    }
+
+    public function testHandleOptionsRequestWithCorsMiddleware(): void
+    {
+        $requestHandler = new ClosureRequestHandler(function () {
+            return new Response(HttpStatus::OK);
+        });
+
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
+        $router->addRoute("GET", "/foo/{name}", $requestHandler);
+
+        $router->addMiddleware(new class implements Middleware {
+            public function handleRequest(Request $request, RequestHandler $requestHandler): Response
+            {
+                if ($request->getMethod() === 'OPTIONS') {
+                    $response = new Response();
+                    $response->setHeader('Access-Control-Allow-Origin', '*');
+                    $response->setStatus(HttpStatus::OK);
+
+                    return $response;
+                }
+
+                return $requestHandler->handleRequest($request);
+            }
+        });
+
+        $this->server->start($router, $this->errorHandler);
+
+        $request = new Request($this->createMock(Client::class), Router::OPTIONS_METHOD, Uri\Http::createFromString("/foo/bar"));
+        $response = $router->handleRequest($request);
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+        $this->assertSame('*', $response->getHeader('access-control-allow-origin'));
     }
 }

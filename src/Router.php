@@ -17,6 +17,7 @@ final class Router implements RequestHandler
     use ForbidCloning;
     use ForbidSerialization;
 
+    public const OPTIONS_METHOD = 'OPTIONS';
     private const DEFAULT_CACHE_SIZE = 512;
 
     private bool $running = false;
@@ -80,6 +81,13 @@ final class Router implements RequestHandler
 
         if (null === $match = $this->cache->get($toMatch)) {
             $match = $this->routeDispatcher->dispatch($method, $path);
+
+            if ($this->isOptionsRequest($match, $method)) {
+                $toMatch = self::OPTIONS_METHOD . "\0{$path}";
+
+                $match = $this->optionsRequests($match[1], $request);
+            }
+
             $this->cache->set($toMatch, $match);
         }
 
@@ -111,6 +119,26 @@ final class Router implements RequestHandler
                 );
                 // @codeCoverageIgnoreEnd
         }
+    }
+
+    private function isOptionsRequest(array $match, string $method): bool
+    {
+        return $match[0] === Dispatcher::METHOD_NOT_ALLOWED
+            && count($match[1]) > 0
+            && $method === self::OPTIONS_METHOD;
+    }
+
+    private function optionsRequests(array $methods, Request $request): array
+    {
+        $handler = new ClosureRequestHandler(fn () => $this->methodNotAllowed($methods, $request));
+
+        $requestHandler = Middleware\stackMiddleware($handler, ...$this->middlewares);
+
+        return [
+            Dispatcher::FOUND,
+            $requestHandler,
+            [],
+        ];
     }
 
     /**

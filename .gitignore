@@ -5,3 +5,5 @@ composer.lock
 phpunit.xml
 vendor
 composer-require-checker.phar
+.php-cs-fixer.php
+tests/coverage
