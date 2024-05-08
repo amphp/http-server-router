@@ -82,7 +82,7 @@ final class Router implements RequestHandler
         if (null === $match = $this->cache->get($toMatch)) {
             $match = $this->routeDispatcher->dispatch($method, $path);
 
-            if ($this->isOptionsRequest($match, $method)) {
+            if ($this->isNotAllowedOptionsMethod($match, $method)) {
                 $toMatch = self::OPTIONS_METHOD . "\0{$path}";
 
                 $match = $this->optionsRequests($match[1], $request);
@@ -119,26 +119,6 @@ final class Router implements RequestHandler
                 );
                 // @codeCoverageIgnoreEnd
         }
-    }
-
-    private function isOptionsRequest(array $match, string $method): bool
-    {
-        return $match[0] === Dispatcher::METHOD_NOT_ALLOWED
-            && count($match[1]) > 0
-            && $method === self::OPTIONS_METHOD;
-    }
-
-    private function optionsRequests(array $methods, Request $request): array
-    {
-        $handler = new ClosureRequestHandler(fn () => $this->methodNotAllowed($methods, $request));
-
-        $requestHandler = Middleware\stackMiddleware($handler, ...$this->middlewares);
-
-        return [
-            Dispatcher::FOUND,
-            $requestHandler,
-            [],
-        ];
     }
 
     /**
@@ -327,5 +307,25 @@ final class Router implements RequestHandler
     {
         $this->routeDispatcher = null;
         $this->running = false;
+    }
+
+    private function isNotAllowedOptionsMethod(array $match, string $method): bool
+    {
+        return $match[0] === Dispatcher::METHOD_NOT_ALLOWED
+            && \count($match[1]) > 0
+            && $method === self::OPTIONS_METHOD;
+    }
+
+    private function optionsRequests(array $methods, Request $request): array
+    {
+        $handler = new ClosureRequestHandler(fn () => $this->methodNotAllowed($methods, $request));
+
+        $requestHandler = Middleware\stackMiddleware($handler, ...$this->middlewares);
+
+        return [
+            Dispatcher::FOUND,
+            $requestHandler,
+            [],
+        ];
     }
 }
