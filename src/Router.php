@@ -74,7 +74,9 @@ final class Router implements RequestHandler
         }
 
         $method = $request->getMethod();
-        $path = \rawurldecode($request->getUri()->getPath());
+
+        $path = \str_ireplace('%2F', '%252F', $request->getUri()->getPath());
+        $path = \rawurldecode($path);
 
         $toMatch = "{$method}\0{$path}";
 

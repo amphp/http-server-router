@@ -214,11 +214,11 @@ class RouterTest extends TestCase
         });
 
         $router = new Router($this->server, $this->testLogger, $this->errorHandler);
-        $router->addRoute("GET", "/fo+ö", $requestHandler);
+        $router->addRoute("GET", "/fo+%2Fö bar", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
 
-        $uri = "/fo+" . \rawurlencode("ö");
+        $uri = "/fo+%2F" . \rawurlencode("ö ") . 'bar';
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString($uri));
         $response = $router->handleRequest($request);
