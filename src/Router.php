@@ -18,6 +18,7 @@ final class Router implements RequestHandler
     use ForbidSerialization;
 
     private const DEFAULT_CACHE_SIZE = 512;
+    private const PATH_REGEX = /** @lang RegExp */ '[%((?:25)*)2[fF]]';
 
     private bool $running = false;
 
@@ -75,7 +76,13 @@ final class Router implements RequestHandler
 
         $method = $request->getMethod();
 
-        $path = \str_ireplace('%2F', '%252F', $request->getUri()->getPath(), $replaceCount);
+        $path = \preg_replace_callback(
+            pattern: self::PATH_REGEX,
+            callback: fn (array $match) => '%' . $match[1] . '252F',
+            subject: $request->getUri()->getPath(),
+            count: $replaceCount,
+        );
+
         $path = \rawurldecode($path);
 
         $toMatch = "{$method}\0{$path}";
@@ -94,7 +101,13 @@ final class Router implements RequestHandler
                 [, $requestHandler, $routeArgs] = $match;
 
                 if ($replaceCount > 0) {
-                    $routeArgs = \array_map(fn (string $arg) => \str_replace('%2F', '/', $arg), $routeArgs);
+                    $replaceCallback = fn (array $match) => $match[1] ? '%' . \substr($match[1], 0, -2) . '2F' : '/';
+
+                    $routeArgs = \array_map(fn (string $arg) => \preg_replace_callback(
+                        pattern: self::PATH_REGEX,
+                        callback: $replaceCallback,
+                        subject: $arg,
+                    ), $routeArgs);
                 }
 
                 $request->setAttribute(self::class, $routeArgs);

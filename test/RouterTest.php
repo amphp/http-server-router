@@ -228,6 +228,27 @@ class RouterTest extends TestCase
         $this->assertEquals(HttpStatus::OK, $response->getStatus());
     }
 
+    public function testPathWithDoubleEncodedSlash(): void
+    {
+        $requestHandler = new ClosureRequestHandler(function (Request $request) {
+            $routeArgs = $request->getAttribute(Router::class);
+            self::assertSame(['s1' => 'baz%2Fo/', 's2' => 'b%252F/ar'], $routeArgs);
+
+            return new Response(HttpStatus::OK);
+        });
+
+        $router = new Router($this->server, $this->testLogger, $this->errorHandler);
+        $router->addRoute("GET", "/foo/{s1}/{s2}", $requestHandler);
+
+        $this->server->start($router, $this->errorHandler);
+
+        $uri = "/foo/baz%252Fo%2F/b%25252F%2Far";
+
+        $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString($uri));
+        $response = $router->handleRequest($request);
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+    }
+
     public function testFallbackInvokedOnNotFoundRoute(): void
     {
         $requestHandler = new ClosureRequestHandler(function () {
