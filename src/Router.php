@@ -74,7 +74,7 @@ final class Router implements RequestHandler
         }
 
         $method = $request->getMethod();
-        $path = \rawurldecode($request->getUri()->getPath());
+        $path = $request->getUri()->getPath();
 
         $toMatch = "{$method}\0{$path}";
 
@@ -90,7 +90,7 @@ final class Router implements RequestHandler
                  * @var array<string, string> $routeArgs
                  */
                 [, $requestHandler, $routeArgs] = $match;
-                $request->setAttribute(self::class, $routeArgs);
+                $request->setAttribute(self::class, \array_map(\rawurldecode(...), $routeArgs));
 
                 return $requestHandler->handleRequest($request);
 
