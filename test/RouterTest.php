@@ -209,16 +209,19 @@ class RouterTest extends TestCase
 
     public function testPathIsMatchedDecoded(): void
     {
-        $requestHandler = new ClosureRequestHandler(function () {
+        $requestHandler = new ClosureRequestHandler(function (Request $request) {
+            $routeArgs = $request->getAttribute(Router::class);
+            self::assertSame(['p1' => 'ba/Ω', 'p2' => '/?'], $routeArgs);
+
             return new Response(HttpStatus::OK);
         });
 
         $router = new Router($this->server, $this->testLogger, $this->errorHandler);
-        $router->addRoute("GET", "/fo+%2Fö bar", $requestHandler);
+        $router->addRoute("GET", "/fo+%2Fö bar/{p1}/{p2}", $requestHandler);
 
         $this->server->start($router, $this->errorHandler);
 
-        $uri = "/fo+%2F" . \rawurlencode("ö ") . 'bar';
+        $uri = "/fo+" . \rawurlencode("/ö ") . 'bar/ba' . \rawurlencode('/Ω') . '/' . \rawurlencode('/?');
 
         $request = new Request($this->createMock(Client::class), "GET", Uri\Http::createFromString($uri));
         $response = $router->handleRequest($request);

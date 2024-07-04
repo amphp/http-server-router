@@ -75,7 +75,7 @@ final class Router implements RequestHandler
 
         $method = $request->getMethod();
 
-        $path = \str_ireplace('%2F', '%252F', $request->getUri()->getPath());
+        $path = \str_ireplace('%2F', '%252F', $request->getUri()->getPath(), $replaceCount);
         $path = \rawurldecode($path);
 
         $toMatch = "{$method}\0{$path}";
@@ -92,6 +92,11 @@ final class Router implements RequestHandler
                  * @var array<string, string> $routeArgs
                  */
                 [, $requestHandler, $routeArgs] = $match;
+
+                if ($replaceCount > 0) {
+                    $routeArgs = \array_map(fn (string $arg) => \str_replace('%2F', '/', $arg), $routeArgs);
+                }
+
                 $request->setAttribute(self::class, $routeArgs);
 
                 return $requestHandler->handleRequest($request);
